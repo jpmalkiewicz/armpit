@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Armpit Scheme build script
+# (Solaris 10 Sparc, GNU assembler version 2.17)
+#
+# Note: Edit Armpit Scheme source file with proper options before
+#       running this script.
+#
+# Example for arm7tdmi:  ./buildarmpit arm7tdmi  050 LPC_H2214
+# Example for arm9:      ./buildarmpit arm9tdmi  050 CS_E9302
+# Example with maverick: ./buildarmpit ep9312    050 CS_E9302
+# Example for Cortex-M3: ./buildarmpit cortex-m3 050 EVB_LM3S1968
+# Example for Cortex-A8: ./buildarmpit cortex-a8 050 TI_Beagle
+#
+arm-none-eabi-as -mcpu=$1 -o a.o armpit_$2.s
+arm-none-eabi-ld -Map bin/armpit_$2_$3.map --script bld_link_addresses -o a.elf a.o
+arm-none-eabi-objcopy -O ihex   a.elf  bin/armpit_$2_$3.hex
+arm-none-eabi-objcopy -O binary a.elf  bin/armpit_$2_$3.bin
+rm a.o
+rm a.elf

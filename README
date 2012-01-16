@@ -1,0 +1,34 @@
+-----------------------------------------------------------------
+
+Armpit Scheme Version 050
+
+(c) 2006-2012, Hubert Montas
+
+Please read license (MIT) in source code file: armpit_050.s
+
+-----------------------------------------------------------------
+This Armpit Scheme distribution has a directory structure.
+The file armpit_050.s at the top of the structure
+(where this README is) imports the needed files for assembly.
+Machine-independent source code, assembler macros and constants
+are in the "common" sub-directory. Machine-specific header files
+and source code are in the "mcu_dependent" sub-directory with
+deeper sub-directories separated by MCU family (eg. LPC_2000).
+
+Pre-built .bin and .hex files are included in the bin directory.
+Corresponding .map files indicate addresses of some symbols.
+
+To re-build (if desired), follow instructions at top of assembly
+source code file armpit_050.s (uncomment and comment-out
+needed options) then run the script: buildarmpit with input
+arguments: cpu-type, version, board (see comments at top of
+buildarmpit for examples). The buildarmpit script and the
+armpit_build_link file that it relies on are in the top directory.
+It reads the source in the top and sub- directories and writes
+binary, hex and map files to the bin directory.
+
+-----------------------------------------------------------------
+
+Visit armpit.sourceforge.net for more information.
+
+-----------------------------------------------------------------

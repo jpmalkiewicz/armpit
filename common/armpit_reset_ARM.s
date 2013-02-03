@@ -1,10 +1,10 @@
-@---------------------------------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
 @
-@  ARMPIT SCHEME Version 050
+@  ARMPIT SCHEME Version 060
 @
 @  ARMPIT SCHEME is distributed under The MIT License.
 
-@  Copyright (c) 2006-2012 Hubert Montas
+@  Copyright (c) 2006-2013 Hubert Montas
 
 @ Permission is hereby granted, free of charge, to any person obtaining
 @ a copy of this software and associated documentation files (the "Software"),
@@ -24,11 +24,11 @@
 @ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 @ OTHER DEALINGS IN THE SOFTWARE.
 @
-@---------------------------------------------------------------------------------------------------
+@-----------------------------------------------------------------------------*/
 
-@-------------------------------------------------------------------------------------
+@-------------------------------------------------------------------------------
 @  I.B.1. ARMv4T, ARMv5TEJ, ARMv7A
-@-------------------------------------------------------------------------------------
+@-------------------------------------------------------------------------------
 
 
 _start:	@ reset startup (address 0x00 normally)
@@ -42,7 +42,7 @@ _start:	@ reset startup (address 0x00 normally)
 	ldr	pc,  =daterr		@ data abort handler
 	.space 4
   .ifndef irq_direct_branch
-        ldr	pc,  [pc, #int_voffset]	@ IRQ:	jump to isr stored in VICVectAddr
+        ldr	pc,  [pc, #int_voffset]	@ IRQ:	jump to isr stord in VICVectAddr
   .else
         ldr	pc,  =genisr		@ IRQ:	jump to genisr
   .endif
@@ -55,52 +55,49 @@ _start:	@ reset startup (address 0x00 normally)
 	b	swi_hndlr		@ software interrupt
 	b	prferr			@ prefetch abort handler
 	b	daterr			@ data abort handler
-	.space 4			@ uploader may write value here (eg. lpc21isp, SAM-BA)
+	.space 4			@ uplodr may wrt val here lpc21isp,SAMBA
         b	genisr			@ IRQ:	jump to genisr
 	b	fiqisr			@ FIQ:	branch to FIQ return
 fiqisr:	subs	pc,  lr, #4		@ FIQ return
 	
 .endif
 
+	SYMSIZE	4
+snster:	.ascii	"inst"
+
+	SYMSIZE	4
+sprfer:	.ascii	"pref"
+	
+	SYMSIZE	4
+sdater:	.ascii	"data"
+
 inserr:	@ undefined instruction handler
 	ldr	rvb, =GRNLED
 	adr	sv4, snster
 	set	sv1, lnk
 	b	errcmn
-	
-snster: SYMSIZE	4
-	.ascii	"inst"
-	.balign	4
-	
+
 prferr:	@ prefetch abort handler
 	ldr	rvb, =REDLED
 	adr	sv4, sprfer
 	sub	sv1, lnk,  #4
 	b	errcmn
 	
-sprfer: SYMSIZE	4
-	.ascii	"pref"
-	.balign	4
-	
 daterr:	@ data abort handler
 	ldr	rvb, =YELLED
 	adr	sv4, sdater
 	sub	sv1, lnk,  #8
 errcmn:	@ [internal entry]
-	ldr	rva, =LEDIO
-	str	rvb, [rva, #io_set]
+	bl	ledon
 	orr	sv1, sv1, #int_tag
 	ldr	lnk, =error4
 	bic	rvb, fre, #0x03
 	orr	fre, rvb, #0x02
 	movs	pc,  lnk
 
-sdater:	SYMSIZE	4
-	.ascii	"data"
-	.balign	4
-
-swi_hndlr: @ switch from user mode to specified mode (including switching interrupts on/off in user mode)
-	ldr	r13, [lnk, #-4]		@ r13  <- swi instruction, including its argument	
+swi_hndlr: @ switch from user mode to specified mode
+	@ (including switching interrupts on/off in user mode)
+	ldr	r13, [lnk, #-4]		@ r13  <- swi instruction, incl. its arg
 	bic	r13, r13, #0xff000000	@ r13  <- new mode = argument of swi
 	msr	spsr_c, r13		@ set into spsr
 	movs	pc,  lnk		@ return
@@ -109,11 +106,11 @@ reset0:	@ soft reset when scheme heap is exhausted
 	swi	isr_normal		@ switch to IRQ mode with interrupts
 	ldr	sp,  =RAMTOP		@ set stack pointer for IRQ mode
 	sub	sp,  sp, #4
-	msr	cpsr_c, #normal_run_mode	@ switch to user mode with interrupts
+	msr	cpsr_c, #normal_run_mode @ switch to user mode with interrupts
 	ldr	sp,  =RAMTOP		@ set stack pointer for system mode
 	sub	sp,  sp, #92
-	bl	rldon			@ turns on red (or other) led on LPC boards
-	bl	gldoff			@ turns on green led on AT91SAM7 board
+	bl	rldon			@ turn on red (or other) led
+	bl	gldoff			@ turn on green (or other) led
 	set	rvb, #0x02		@ reset and stop/disable Timers
 	ldr	rva, =timer0_base
 	str	rvb, [rva, #timer_ctrl]
@@ -131,23 +128,23 @@ reset:	@ set stacks for various MCU modes
 	orr	cnt, cnt, #0x08
 	mcr	p15, 0, cnt, c1, c0, 0	@ enable buffered writes to AMBA AHB
 	set	cnt, #0x40000
-	mcr	p15, 1, cnt, c15, c1, 0	@ order TCM instructions (cf. errata, Flash memory)
+	mcr	p15, 1, cnt, c15, c1, 0	@ order TCM instr (cf.errata, Flash mem)
 .endif
 	ldr	r3, =RAMTOP
 	sub	fre, r3, #4
 	msr	CPSR_c,  #0x1F		@ switch to system mode with interrupts
 	set	sp, fre			@ set system mode stack pointer
-	msr	CPSR_c,  #0x1B		@ switch to undef instr mode with interrupts
+	msr	CPSR_c,  #0x1B		@ switch to undef instr mode with ints
 	set	sp, fre			@ set undef instr mode stack pointer
 	msr	CPSR_c,  #0x17		@ switch to abort mode with interrupts
 	set	sp, fre			@ set abort mode stack pointer
-	msr	CPSR_c,  #0x13		@ switch to supervisor mode with interrupts
+	msr	CPSR_c,  #0x13		@ switch to supervisor mode with ints
 	set	sp, fre			@ set service mode stack pointer
 	msr	CPSR_c,  #isr_normal	@ switch to IRQ mode with interrupts
 	set	sp, fre			@ set IRQ mode stack pointer
 	msr	CPSR_c,  #0x11		@ switch to FIQ mode with interrupts
 	set	sp, fre			@ set FIQ mode stack pointer
-	msr	cpsr_c, #normal_run_mode	@ switch to user mode with interrupts
+	msr	cpsr_c, #normal_run_mode @ switch to user mode with interrupts
 	sub	sp,  r3, #92		@ set user mode stack pointer
 
 

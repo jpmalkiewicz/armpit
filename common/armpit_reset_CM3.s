@@ -1,10 +1,10 @@
-@---------------------------------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
 @
-@  ARMPIT SCHEME Version 050
+@  ARMPIT SCHEME Version 060
 @
 @  ARMPIT SCHEME is distributed under The MIT License.
 
-@  Copyright (c) 2006-2012 Hubert Montas
+@  Copyright (c) 2006-2013 Hubert Montas
 
 @ Permission is hereby granted, free of charge, to any person obtaining
 @ a copy of this software and associated documentation files (the "Software"),
@@ -24,29 +24,29 @@
 @ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 @ OTHER DEALINGS IN THE SOFTWARE.
 @
-@---------------------------------------------------------------------------------------------------
+@-----------------------------------------------------------------------------*/
 
-
-@-------------------------------------------------------------------------------------
+@-------------------------------------------------------------------------------
 @  I.B.2. Cortex
-@-------------------------------------------------------------------------------------
+@-------------------------------------------------------------------------------
 
-_start:
-	.word	RAMTOP				@ 0x00 - Main Stack base address
+.ifndef	run_from_ram
+
+_start:	.word	MAIN_STACK			@ 0x00 - Main Stack base address
 	.word	reset				@ 0x01 - Reset isr
-	.word	nmi_hndlr			@ 0x02 - Non Maskable Interrupt isr
+	.word	nmi_hndlr			@ 0x02 - Non Maskable Int isr
 	.word	fault_hndlr			@ 0x03 - Hard Fault isr
 	.word	mpu_hndlr			@ 0x04 - MPU isr
 	.word	busf_hndlr			@ 0x05 - Bus Fault isr
 	.word	usef_hndlr			@ 0x06 - Usage Fault isr
-	.word	0x00				@ 0x07 - reserved (check_sum on LPC)
+	.word	0x00				@ 0x07 - reserved (LPC checksum)
 	.word	0x00				@ 0x08 - reserved
 	.word	0x00				@ 0x09 - reserved
 	.word	0x00				@ 0x0A - reserved
-	.word	svc_hndlr			@ 0x0B - software interrupt handler
+	.word	svc_hndlr			@ 0x0B - software int handler
 	.word	debug_hndlr			@ 0x0C - debug monitor
 	.word	0x00				@ 0x0D - reserved
-	.word	pends_hndlr			@ 0x0E - pendable service request
+	.word	pends_hndlr			@ 0x0E - pendable service reqst
 	.word	tick_hndlr			@ 0x0F - SYS Tick handler
 	.word	genisr, genisr, genisr, genisr	@ 0x10-0x13 -> INT 00-03
 	.word	genisr, genisr, genisr, genisr	@ 0x14-0x17 -> INT 04-07
@@ -56,6 +56,7 @@ _start:
 	.word	genisr, genisr, genisr, genisr	@ 0x24-0x27 -> INT 20-23
 	.word	genisr, genisr, genisr, genisr	@ 0x28-0x2B -> INT 24-27
 	.word	genisr, genisr, genisr, genisr	@ 0x2C-0x2F -> INT 28-31
+.if num_interrupts > 32
 	.word	genisr, genisr, genisr, genisr	@ 0x30-0x33 -> INT 32-33
 	.word	genisr, genisr, genisr, genisr	@ 0x34-0x37 -> INT 36-39
 	.word	genisr, genisr, genisr, genisr	@ 0x38-0x3B -> INT 40-43
@@ -64,8 +65,9 @@ _start:
 	.word	genisr, genisr, genisr, genisr	@ 0x44-0x47 -> INT 52-55
 	.word	genisr, genisr, genisr, genisr	@ 0x48-0x4B -> INT 56-59
 	.word	genisr, genisr, genisr, genisr	@ 0x4C-0x4F -> INT 60-63
+.endif
 .if num_interrupts > 64
-	.word	genisr, genisr, genisr, genisr	@ 0x50-0x53 -> INT 64-67, eg. STM32 connectivity line
+	.word	genisr, genisr, genisr, genisr	@ 0x50-0x53 -> INT 64-67
 	.word	genisr, genisr, genisr, genisr	@ 0x54-0x57 -> INT 68-71
 	.word	genisr, genisr, genisr, genisr	@ 0x58-0x5B -> INT 72-75
 	.word	genisr, genisr, genisr, genisr	@ 0x5C-0x5F -> INT 76-79
@@ -74,13 +76,66 @@ _start:
 	.word	genisr, genisr, genisr, genisr	@ 0x68-0x6B -> INT 88-91
 	.word	genisr, genisr, genisr, genisr	@ 0x6C-0x6F -> INT 92-95
 .endif
+.if num_interrupts > 96
+	.word	genisr, genisr, genisr, genisr	@ 0x50-0x53 -> INT  96--99
+	.word	genisr, genisr, genisr, genisr	@ 0x54-0x57 -> INT 100-103
+	.word	genisr, genisr, genisr, genisr	@ 0x58-0x5B -> INT 104-107
+	.word	genisr, genisr, genisr, genisr	@ 0x5C-0x5F -> INT 108-111
+	.word	genisr, genisr, genisr, genisr	@ 0x60-0x63 -> INT 112-115
+	.word	genisr, genisr, genisr, genisr	@ 0x64-0x67 -> INT 116-119
+	.word	genisr, genisr, genisr, genisr	@ 0x68-0x6B -> INT 120-123
+	.word	genisr, genisr, genisr, genisr	@ 0x6C-0x6F -> INT 124-127
+.endif
+.if num_interrupts > 128
+	.word	genisr, genisr, genisr, genisr	@ 0x50-0x53 -> INT 128-131
+	.word	genisr, genisr, genisr, genisr	@ 0x54-0x57 -> INT 132-135
+	.word	genisr, genisr, genisr, genisr	@ 0x58-0x5B -> INT 136-139
+	.word	genisr, genisr, genisr, genisr	@ 0x5C-0x5F -> INT 140-143
+	.word	genisr, genisr, genisr, genisr	@ 0x60-0x63 -> INT 144-147
+	.word	genisr, genisr, genisr, genisr	@ 0x64-0x67 -> INT 148-151
+	.word	genisr, genisr, genisr, genisr	@ 0x68-0x6B -> INT 152-155
+	.word	genisr, genisr, genisr, genisr	@ 0x6C-0x6F -> INT 156-159
+.endif
 
+.endif	@ run_from_ram
+
+.ifdef	enable_MPU
 _func_
-nmi_hndlr:
+mpu_hndlr:
+	@ perform gc on MPU FAULT
+	mrs	fre, psp		@ fre <- psp stack
+	@ find start address of memory allocation sequence
+	ldr	rva, =0x0003F020	@ rva <- mach code of: bic fre, fre, #3
+	ldr	rvb, [fre, #24]		@ rvb <- address of faulted storage inst
+	bic	rvb, rvb, #0x01		@ rvb <- address with cleared Thumb bit
+cisrch:	sub	rvb, rvb, #2
+	ldr	cnt, [rvb]
+	eq	cnt, rva
+	bne	cisrch
+	add	cnt, rvb, #4
+	@ de-reserve memory in case an int (eg. timer) arose while handling this
+	ldr	rvb, [fre]
+	bic	rvb, rvb, #7		@ rvb <- 8-byte aligned (eg. for ibcons)
+	orr	rvb, rvb, #0x02
+	str	rvb, [fre]
+	@ set stack up to perform gc
+	set	rvb, #24		@ rvb <- 24 default/max num bytes needed
+	str	rvb, [fre, #12]		@ set number of bytes needed from gc
+	ldr	rva, =gc_bgn		@ rva <- address of gc routine	
+	set	rvb, #normal_run_mode	@ rvb <- normal run mode
+	add	fre, fre, #20
+	stmia	fre, {cnt, rva, rvb}	@ set svd lnk_usr,pc_usr,run_mode for gc
+	bx	lnk			@ jump to gc, thread mode, process stack
+.else
+_func_
+mpu_hndlr:
+	@ continue to nmi_hndler, etc... (default fault handlers)
+.endif
+
 _func_
 fault_hndlr:
 _func_
-mpu_hndlr:
+nmi_hndlr:
 _func_
 busf_hndlr:
 _func_
@@ -93,67 +148,178 @@ pends_hndlr:
 
 _func_
 tick_hndlr:
-	mrs	sp,  psp		@ sp  <- psp stack
-	@ *** Workaround for Cortex-M3 errata bug #382859, Category 2, present in r0p0, fixed in r1p0
+	mrs	rvc, psp		@ rvc <- psp stack
+	set	sp,  rvc		@ sp  <- psp stack, for genis0
+	@ *** Workaround for Cortex-M3 errata bug #382859, Category 2,
+	@ *** present in r0p0, fixed in r1p0,
 	@ *** affects LM3S1968 (needed for multitasking)
 	ldr	rvb, [sp, #28]		@ rvb <- saved xPSR
-	ldr	rva, =0x0600000c	@ rva <- bit mask to identfy if interrupted instruction was ldm/stm
+	ldr	rva, =0x0600000c	@ rva <- msk to id if ldm/stm intrptd
 	tst	rvb, rva		@ was interruted instruction ldm/stm?
 	itT	eq
-	biceq	rvb, rvb, #0xf0		@	if so,  rvb <- xPSR set to restart (not continue) ldm/stm
+	biceq	rvb, rvb, #0xf0		@	if so,  rvb <- xPSR to restart
 	streq	rvb, [sp, #28]		@	if so,  store xPSR back on stack
 	@ *** end of workaround
 	ldr	rva, =systick_base
 	ldr	rvb, [rva, #tick_ctrl]	@ clear the tick flag
 	set	rvb, #0x05
-	str	rvb, [rva, #tick_ctrl]	@ disable systick interrupt generation (if set)
-	set	rvb, #64		@ rvb <-  64 = interrupt number for systick
+	str	rvb, [rva, #tick_ctrl]	@ disab systick int generation (if set)
+@	set	rvb, #64		@ rvb <-  64 = interrupt num for systick
+	set	rvb, #0xff		@ rvb <- 255 = interrupt num for systick
 	b	genis0
 
 _func_
 svc_hndlr:
-	mrs	sp,  psp		@ sp  <- psp stack
-	ldr	r12, [sp,  #24]		@ r1  <- saved lnk_irq (pc_usr) from stack
-	ldrh	r2,  [r12, #-2]		@ r2  <- svc instruction, including its argument
-	and	r3,  r2,  #0xff		@ r3  <- argument of svc
-	eq	r3,  #isr_no_irq	@ stay in irq mode and continue?
-	itT	eq
-	addeq	sp,  sp, #32
-	seteq	pc,  r12		@	if so,  return, while in IRQ mode
-	ldr	r1,  =int_en_base
-	eq	r3,  #run_normal	@ enable interrupts?
+	mrs	rva, psp		@ rva <- psp stack
+	ldr	rvc, [rva, #24]		@ rvc <- saved lnk_irq (pc_usr) frm stk
+	ldrh	rvb, [rvc, #-2]		@ rvb <- svc instruction, incl its arg
+	and	rvb, rvb, #0xff		@ rvb <- argument of svc
+	eq	rvb, #isr_no_irq	@ stay in irq mode and continue?
+	itTT	eq
+	seteq	sp,  rva		@ 	if so,  sp  <- psp stack
+	addeq	sp,  sp, #32		@ 	if so,  sp  <- psp stack, updatd
+	seteq	pc,  rvc		@	if so,  return, in IRQ mode
+svcigc:	@ [internal entry from genism]
+	ldr	cnt, =int_en_base
+	eq	rvb, #run_normal	@ enable interrupts?
 	it	ne
-	addne	r1,  r1, #int_disab1
+	addne	cnt, cnt, #int_disab1
 	@ enable/disable scheme interrupts
-	ldr	r2,  =BUFFER_START
-	vcrfi	r0,  r2, CTX_EI_offset	 @ r0 <- enabled scheme interrupts  0-31 (raw)
-	str	r0,  [r1, #0x00]
-	vcrfi	r0,  r2, CTX_EI_offset+4 @ r0 <- enabled scheme interrupts 32-63 (raw)
-	str	r0,  [r1, #0x04]
-.if num_interrupts > 64
-	vcrfi	r0,  r2, CTX_EI_offset+8 @ r0 <- enabled scheme interrupts 64-95 (raw)
-	str	r0,  [r1, #0x08]
+	ldr	rva, =BUFFER_START
+	vcrfi	fre, rva, CTX_EI_offset	   @ fre <- enabled scheme ints   0--31
+	str	fre, [cnt, #0x00]
+.if num_interrupts > 32
+	vcrfi	fre, rva, CTX_EI_offset+4  @ fre <- enabled scheme ints  32--63
+	str	fre, [cnt, #0x04]
 .endif
-	ldr	pc,  =0xfffffffd	@ return to thread mode, use process stack
+.if num_interrupts > 64
+	vcrfi	fre, rva, CTX_EI_offset+8  @ fre <- enabled scheme ints  64--95
+	str	fre, [cnt, #0x08]
+.endif
+.if num_interrupts > 96
+	vcrfi	fre, rva, CTX_EI_offset+12 @ fre <- enabled scheme ints  96-127
+	str	fre, [cnt, #0x0C]
+.endif
+.if num_interrupts > 128
+	vcrfi	fre, rva, CTX_EI_offset+16 @ fre <- enabled scheme ints 128-159
+	str	fre, [cnt, #0x10]
+.endif
+	mrs	rva, control		@ rva  <- content of Processor Cntrl reg
+	eq	rvb, #run_prvlgd	@ set thread mode to privileged, no irq?
+	itE	eq
+	biceq	rva, rva, #0x01		@ 	if so,  rva  <- prvlgd Thread bt
+	orrne	rva, rva, #0x01		@ 	if not, rva  <- unprvlgd Thrd bt
+	msr	control, rva		@ set Thread mode to privil/unprivileged
+	ldr	pc,  =0xfffffffd	@ return to thread mode, w/process stack
+
+
+.ifdef	enable_MPU
+
+_func_
+hptp2mpu: @ update MPU for new heaptop(s)
+	@ called via:	bl, entered right after "swi run_prvlgd" so dsb/isb
+	@						not needed on entry
+	@ called with:	mcu in privileged mode (set before call)
+	@ modifies:	rvb, rvc
+	@ returns via:	lnk
+	ldr	rvc, =mpu_base		@ rva      <- address of MPU_TYPE
+	set	rvb, #3
+	str	rvb, [rvc, #0x08]	@ MPU_RNR  <- set region to 3
+	set	rvb, #0x0008		@ rvb      <- size = 32B
+	strh	rvb, [rvc, #0x10]	@ MPU_RASR <- set region size (disabled)
+  .ifndef mark_and_sweep
+	vcrfi	rvb, glv, 9		@ rvc <- heaptop0 -- from global vector
+  .else
+	vcrfi	rvb, glv, 1		@ rva <- heaptop -- from global vector
+  .endif
+	bic	rvb, rvb, #i0		@ rvb      <- heaptop region (32B align)
+	str	rvb, [rvc, #0x0c]	@ MPU_RBAR <- set region start address
+	ldr	rvb, =0x02040009	@ rvb      <- nrm hndl rw,usr ro,shr,32B
+	str	rvb, [rvc, #0x10]	@ MPU_RASR <- set regn attrs (enabled)
+  .ifndef mark_and_sweep
+	set	rvb, #4
+	str	rvb, [rvc, #0x08]	@ MPU_RNR  <- set region to 4
+	set	rvb, #0x0008		@ rvb      <- size = 32B
+	strh	rvb, [rvc, #0x10]	@ MPU_RASR <- set region size (disabled)
+	vcrfi	rvb, glv, 10		@ rvb      <- heaptop1 from global vec
+	bic	rvb, rvb, #i0		@ rvb      <- heaptop region (32B align)
+	str	rvb, [rvc, #0x0c]	@ MPU_RBAR <- set region start address
+	ldr	rvb, =0x02040009	@ rvb      <- nrm hndl rw,usr ro,shr,32B
+	str	rvb, [rvc, #0x10]	@ MPU_RASR <- set region attributes
+  .endif
+	dsb				@ complete outstanding data accesses
+	isb				@ complete outstanding instructions
+	set	pc,  lnk		@ return
+.endif
+
+_func_
+isrreset: @ soft reset when heap is exhausted and system is in IRQ Handler mode
+	mrs	rva, control		@ rva  <- content of Processor Cntrl reg
+	bic	rva, rva, #0x01		@ rva  <- bit for privilegd Thread mode
+	msr	control, rva		@ set Thread mode to privlgd (for reset)
+	mrs	rvc, psp		@ rvc <- psp stack
+	ldr	rvb, =reset		@ rvb <- address of reset routine
+	str	rvb, [rvc, #24]		@ set saved pc_usr (lnk_irq) for reset
+	set	rvb, #normal_run_mode	@ rvb <- normal run mode
+	str	rvb, [rvc, #28]		@ set normal run mode in saved xPSR
+	ldr	pc,  =0xfffffffd	@ jump to reset in privileged thread mod
 
 _func_
 reset0:	@ soft reset when scheme heap is exhausted
-	ldr	r0,  =RAMTOP - 88	@ r0  <- address of Process Stack
-	msr	psp, r0			@ Set Process stack address
-	mrs	r0,  control		@ r0  <- contents of Processor Control register
-	orr	r0,  r0, #0x02		@ r0  <- code to use Process stack
-	bic	r0,  r0, #0x01		@ r0  <- code to drop to User (unprivileged) mode
-	msr	control, r0		@ drop to User mode and use Process stack
-	bl	rldon			@ turns on red (or other) led on LPC boards
-	bl	gldoff			@ turns on green led on AT91SAM7 board
-	b	scinit			@ jump to initialize scheme and boot
+	bl	rldon			@ turns on red (or other) led
+	bl	gldoff			@ turns on green led (or other)
+	swi	run_prvlgd		@ set Thread mode, privileged, no IRQ
+	@ continue to reset (below)
 
 _func_
-reset:	@ configure Process Stack, select it and drop to User mode
-	ldr	r0,  =RAMTOP - 88	@ r0  <- address of Process Stack
-	msr	psp, r0			@ Set Process stack address
-	mrs	r0,  control		@ r0  <- contents of Processor Control register
-	orr	r0,  r0, #0x02		@ r0  <- code to use Process stack
-	bic	r0,  r0, #0x01		@ r0  <- code to drop to User (unprivileged) mode
-	msr	control, r0		@ drop to User mode and use Process stack
-	
+reset:	@ enable MPU if desired (done in privileged mode)
+.ifdef	enable_MPU
+	@ for cortex-M4 MPU and memory map
+	ldr	rva, =mpu_base		@ rva      <- address of MPU_TYPE
+	set	rvb, #5			@ rvb      <- bit to enab MPU w/dflt map
+	str	rvb, [rva, #0x04]	@ MPU_CTRL <- enable MPU
+	set	rvb, #0x10		@ rvb      <- region 0 adrs=0x00, valid
+	str	rvb, [rva, #0x0c]	@ MPU_RBAR <- set region start address
+	ldr	rvb, =0x0306003f	@ rvb      <- norml mem rw,shar,cach,4GB
+	str	rvb, [rva, #0x10]	@ MPU_RASR <- set region attributes
+	set	rvb, #0x11		@ rvb      <- region 1 adrs=0x00, valid
+	str	rvb, [rva, #0x0c]	@ MPU_RBAR <- set region start address
+	ldr	rvb, =0x13051b3f	@ rvb      <- dev xn,rw,share,4GB w/hols
+	str	rvb, [rva, #0x10]	@ MPU_RASR <- set region attributes
+	ldr	rvb, =0xe0000012	@ rvb      <- region 2 adrs=0xe0000000
+	str	rvb, [rva, #0x0c]	@ MPU_RBAR <- set region start address
+	ldr	rvb, =0x13040027	@ rvb      <- strng-ordrd xn,rw,shar,1MB
+	str	rvb, [rva, #0x10]	@ MPU_RASR <- set region attributes
+	ldr	rva, =0xe000ed24	@ rva <- address of SHCSR register
+	set	rvb, #(1 << 16)		@ rvb <- bit to enab rprtng MemMng Fault
+	str	rvb, [rva]		@ enable MemManage fault handling
+.endif
+.ifdef	hardware_FPU
+	@ enable FPU if desired (done in privileged mode, enables all access)
+	ldr	rva, =0xe000ed88	@ rva    <- address of CPACR
+	ldr	rvb, [rva]		@ rvb    <- contents of CPACR
+	orr	rvb, rvb, #(0xf << 20)	@ rvb    <- bits 20-23 enab CP10,11 FPU
+	str	rvb, [rva]		@ CPACR <- enable FPU
+	dsb				@ wait for store (bit 20-23) to complete
+	isb				@ wait for instr to complete (FPU enbld)
+	vmrs	rva, fpscr		@ rva    <- contents of FPSCR
+	orr	rva, rva, #0x00c00000	@ rva    <- round towards zero (trunc)
+	vmsr	fpscr, rva		@ FPSCR <- updated rounding mode
+	ldr	rva, =0xe000ef34	@ rva    <- address of FPCCR
+	set	rvb, #0			@ rvb    <- all bits cleared
+	str	rvb, [rva]		@ FPCCR <- no FPU reg stacking on int
+	dsb				@ wait for store to complete
+	isb				@ wait for instruction to complete
+.endif
+	@ configure Process Stack, select it and drop to User mode
+	ldr	rva, =MAIN_STACK - 88	@ rva  <- address of Process Stack
+	msr	psp, rva		@ Set Process stack address
+	mrs	rva, control		@ rva  <- content of Processor Cntrl reg
+	orr	rva, rva, #0x02		@ rva  <- code to use Process stack
+.ifdef	hardware_FPU
+	bic	rva, rva, #0x04		@ rva  <- clear FPCA bit (make sure)
+.endif
+	orr	rva, rva, #0x01		@ rva  <- bit for User (unpriv) mode
+	msr	control, rva		@ drop to unprivlgd mode, Process stack
+
+

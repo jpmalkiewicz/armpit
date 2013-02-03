@@ -1,10 +1,10 @@
-@---------------------------------------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
 @
-@  ARMPIT SCHEME Version 050
+@  ARMPIT SCHEME Version 060
 @
 @  ARMPIT SCHEME is distributed under The MIT License.
 
-@  Copyright (c) 2006-2012 Hubert Montas
+@  Copyright (c) 2006-2013 Hubert Montas
 
 @ Permission is hereby granted, free of charge, to any person obtaining
 @ a copy of this software and associated documentation files (the "Software"),
@@ -24,13 +24,13 @@
 @ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 @ OTHER DEALINGS IN THE SOFTWARE.
 @
-@---------------------------------------------------------------------------------------------------------
+@-----------------------------------------------------------------------------*/
 
-@---------------------------------------------------------------------------------------------------------
-@
-@  0.G.	  ASSEMBLER MACROS for SCHEME
-@
-@---------------------------------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------*\
+|
+|  0.G.	  ASSEMBLER MACROS for SCHEME
+|
+\*----------------------------------------------------------------------------*/
 
 .macro _func_
   .ifdef cortex
@@ -39,40 +39,69 @@
 .endm
 
 .macro	SYMSIZE n
+	.balign	8
 	.word	(\n << 8) | symbol_tag
 .endm
 
 .macro	VECSIZE n
+	.balign	8
 	.word	((\n) << 8) | vector_tag
 .endm
 
 .macro	VU8SIZE n
+	.balign	8
 	.word	((\n) << 8) | bytevector_tag
 .endm
 
-.macro	SYNTAX narg
-	.word	(1 << 11) | (\narg << 8) | proc
+.macro	DSYNTAX fname, target, narg
+	.word	\fname
+	.hword	(1 << 12) | (1 << 11) | (\narg << 8) | bltn
+	.hword	(\target - start_of_code) | lnkbit0
 .endm
-	
-.macro	ESYNTAX initsv4, fentry, narg
-	.word	((\initsv4) << 24) | (\fentry << 16) | (1 << 11) | (\narg << 8) | proc
+
+.macro	DESYNTAX fname, initsv4, fentry, narg
+	.word	\fname
+	.word	((\initsv4)<<16)|(\fentry<<24)|(3<<12)|(1<<11)|(\narg<<8)|bltn
 .endm
-	
+
 .macro	PFUNC narg
+	.balign	8
 	.word	(\narg << 8) | proc
 .endm
-	
+
 .macro	EPFUNC initsv4, fentry, narg
-	.word	((\initsv4) << 24) | (\fentry << 16) | (\narg << 8) | proc
+	.balign	8
+	.word	((\initsv4) << 16)|(\fentry << 24)|(3 << 12)|(\narg << 8)|proc
+.endm
+
+.macro	DPFUNC fname, target, narg
+	.word	\fname
+	.hword	(1 << 12) | (\narg << 8) | bltn
+	.hword	(\target - start_of_code) | lnkbit0
+.endm
+
+.macro	DEPFUNC fname, initsv4, fentry, narg
+	.word	\fname
+	.word	((\initsv4) << 16)|(\fentry << 24)|(3 << 12)|(\narg << 8)|bltn
+.endm
+
+.macro	UPFUNC target, narg
+	.hword	(1 << 12) | (\narg << 8) | bltn
+	.hword	(\target - start_of_code) | lnkbit0
+.endm
+
+.macro	MACRO
+	.balign	8
+	.word	(1 << 11) | proc
 .endm
 
 .macro	r2i rawint
 	((\rawint << 2) | i0)
 .endm
-	
-@
-@ 4.1.6. Assignments
-@
+
+/*------------------------------------------------------------------------------
+	4.1.6. Assignments
+------------------------------------------------------------------------------*/
 
 .macro set var, expr
 	mov	\var,  \expr
@@ -102,9 +131,9 @@
 	movhi	\var,  \expr
 .endm
 
-@
-@ 6.1. Equivalence predicates
-@
+/*------------------------------------------------------------------------------
+	6.1. Equivalence predicates
+------------------------------------------------------------------------------*/
 
 .macro eq obj1, obj2
 	teq	\obj1,  \obj2
@@ -118,9 +147,9 @@
 	teqne	\obj1,  \obj2
 .endm
 
-@
-@ 6.2.5. Numerical operations (including addendum)
-@
+/*------------------------------------------------------------------------------
+	6.2.5. Numerical operations (including addendum)
+------------------------------------------------------------------------------*/
 
 .macro incr dest, source
 	add	\dest,  \source, #4
@@ -159,7 +188,7 @@
 
 .macro intgrpne obj
 	@ raise eq flag if obj is an integer
-	@ uses rva
+	@ modifies:	rva
 	itT	ne
 	andne	rva, \obj,  #0x03	@ rva <- two-bit tag of object in num
 	eqne	rva, #int_tag		@ is object an integer?
@@ -167,27 +196,29 @@
 
 .macro floatp obj
 	@ raise eq flag if obj is a float
-	@ uses rva
+	@ modifies:	rva
 	and	rva, \obj,  #0x03	@ rva <- two-bit tag of object in num
 	eq	rva, #float_tag		@ is object a float?
 .endm
 
 .macro ratiop obj
 	@ raise eq flag if obj is a rational
-	@ uses rva
-	pntrp	\obj
+	@ modifies:	rva
+	and	rva, \obj, #0x07
+	eq	rva, #0x04
 	itTT	eq
-	careq	rva, \obj
+	ldreq	rva, [\obj, #-4]
 	andeq	rva, rva,  #0x0F	@ rva <- four-bit tag of object
 	eqeq	rva, #rational_tag	@ is object a rational?
 .endm
 
 .macro cmplxp obj
 	@ raise eq flag if obj is a complex
-	@ uses rva
-	pntrp	\obj
+	@ modifies:	rva
+	and	rva, \obj, #0x07
+	eq	rva, #0x04
 	itTT	eq
-	careq	rva, \obj
+	ldreq	rva, [\obj, #-4]
 	andeq	rva, rva,  #0x0F	@ rva <- four-bit tag of object
 	eqeq	rva, #complex_tag	@ is object a complex?
 .endm
@@ -321,64 +352,87 @@
 	bic	\dest, \val, #0x80000000	@ \dest <- unsigned \val (scheme float)	
 .endm
 
-.macro numerat dest, num
+.macro rawsplt wrd1, wrd2, ratcpx
+	@ returns the two parts (raw) of a  rat/cpx
+	@ wrd1 and wrd2 registers should be ascending
+  .ifndef cortex
+	ldmda	\ratcpx, {\wrd1, \wrd2}		@ <- this may be backwards (wrd1 vs wrd2)
+  .else
+	ldr	\wrd1, [\ratcpx, #-4]
+	ldr	\wrd2, [\ratcpx]
+  .endif
+.endm
+	
+.macro rwspleq wrd1, wrd2, ratcpx
+	@ returns the two parts (raw) of a  rat/cpx
+	@ wrd1 and wrd2 registers should be ascending
+  .ifndef cortex
+	ldmdaeq	\ratcpx, {\wrd1, \wrd2}		@ <- this may be backwards (wrd1 vs wrd2)
+  .else
+	ldreq	\wrd1, [\ratcpx, #-4]
+	it	eq
+	ldreq	\wrd2, [\ratcpx]
+  .endif
+.endm
+	
+.macro numerat dest, rat
 	@ returns the numerator (scheme int) of a rational
-	@ uses:	 rva, rvb
-	snoc	rva, rvb, \num		@
+	@ modifies:	rva, rvb
+	rawsplt	rva, rvb, \rat
 	lsr	rva, rva, #2
 	orr	rva, rva, rvb, lsl #30
 	orr	\dest, rva, #int_tag
 .endm
 	
-.macro nmrtreq dest, num
+.macro nmrtreq dest, rat
 	@ returns the numerator (scheme int) of a rational
-	@ uses:	 rva, rvb
-	snoceq	rva, rvb, \num		@
+	@ modifies:	rva, rvb
+	rwspleq rva, rvb, \rat
 	itTT	eq
 	lsreq	rva, rva, #2
 	orreq	rva, rva, rvb, lsl #30
 	orreq	\dest, rva, #int_tag
 .endm
 	
-.macro denom dest, num
+.macro denom dest, rat
 	@ returns the denominator (scheme int) of a rational
-	@ uses:	 rva
-	cdr	rva, \num
+	@ modifies:	rva
+	ldr	rva, [\rat]
 	bic	rva, rva, #3
 	orr	\dest, rva, #int_tag
 .endm
 
 .macro spltrat nmr, dnm, rat
 	@ returns the numerator (scheme int) and denominator (scheme int) of a rational
-	@ uses:	 rva, rvb
-	snoc	rva, rvb, \rat		@
+	@ modifies:	rva, rvb
+	rawsplt	rva, rvb, \rat
 	lsr	rva, rva, #2
 	orr	rva, rva, rvb, lsl #30	
 	bic	rvb, rvb, #3
 	orr	\nmr, rva, #int_tag
 	orr	\dnm, rvb, #int_tag
 .endm
-	
-.macro real dest, num
+
+.macro real dest, cpx
 	@ returns the real part (scheme float) of a complex
-	@ uses:	 rva, rvb
-	snoc	rva, rvb, \num
+	@ modifies:	rva, rvb
+	rawsplt	rva, rvb, \cpx
 	lsr	rva, rva, #2
 	orr	\dest, rva, rvb, lsl #30
 .endm
-	
-.macro imag dest, num
+
+.macro imag dest, cpx
 	@ returns the imaginary (scheme float) of a complex
-	@ uses:	 rva
-	cdr	rva, \num
+	@ modifies:	rva
+	ldr	rva, [\cpx]
 	bic	rva, rva, #3
 	orr	\dest, rva, #float_tag
 .endm
 
 .macro spltcpx real, imag, cpx
 	@ returns the real part (scheme float) and imaginary part (scheme float) of a complex
-	@ uses:	 rva, rvb
-	snoc	rva, rvb, \cpx
+	@ modifies:	rva, rvb
+	rawsplt	rva, rvb, \cpx
 	lsr	rva, rva, #2
 	orr	\real, rva, rvb, lsl #30
 	bic	rvb, rvb, #3
@@ -413,37 +467,253 @@
 	addne	\num, \num, #3			@	if not, negate mantissa
 .endm
 
-@
-@ 6.3.2. Pairs and lists
-@
+/*------------------------------------------------------------------------------
+	6.3.2. Pairs and lists
+------------------------------------------------------------------------------*/
 
-.macro isave reg
-	@ inlined version of save macro (below)
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
+
+.macro memsetlnk
+  .ifndef cortex
+	sub	lnk, pc,  #4		@ lnk <- memory transaction return adrs
+  .else
 	set	lnk, pc
 	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	cmp	rva, fre		@ is an 8-byte cell available?
+	orr	lnk, lnk,  #lnkbit0	@ lnk <- mem trnsct ret adrs Thumb2 mode
+  .endif
+.endm
+
+.macro memfrchk8
+	eor	fre, fre, #0x03		@ fre <- ...bbb01	(reserv level 1)
+	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector
+	cmp	rva, fre		@ is a 16-byte cell available?
+.endm
+
+.macro memfrck bytes
+	eor	fre, fre, #0x03		@ fre <- ...bbb01	(reserv level 1)
+	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector
+	sub	rva, rva, #(\bytes - 8)	@ rva <- comparison address
+	cmp	rva, fre		@ is a 16-byte cell available?
+.endm
+
+.macro cons1 upd, dest, car, cdr
+	@ upd is rva without MPU or fre with MPU
+	bic	\upd, fre, #0x03	@ upd  <- free cell address and, with MPU, (reservation level 2)
+	stmia	\upd!, {\car, \cdr}	@ upd  <- address of next free cell, and store car, cdr in free cell
+	sub	\dest, \upd, #8		@ dest <- address of save cell, [*commit save destination*]
+	orr	fre, \upd, #0x02	@ de-reserve free-pointer, [*restart critical instruction*]
+.endm
+
+.macro icons dest, car, cdr
+	@ inlined cons or cons with MPU enabled
+	@ dest <- (car . cdr)
+  .ifdef enable_MPU
+  	cons1	fre, \dest, \car, \cdr	@ reserve, store, commit and de-reserve
+  .else
+	memsetlnk			@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrchk8			@ reserve memory, sufficient space available?
 	bls	alogc8			@	if not,  jump to perform gc
-	bic	rva, fre, #0x03		@ rva <- address of allocated memory
-	stmia	rva!, {\reg, dts}	@ rva <- address of next free cell, and store reg, dts in free cell
-	sub	dts, rva, #8		@ dts <- address of save cell, [*commit save destination*]
+  	cons1	rva, \dest, \car, \cdr	@ store, commit and de-reserve
+  .endif
+.endm
+
+.macro cons dest, car, cdr
+	@ generic cons
+	@ dest <- (car . cdr)
+  .ifdef enable_MPU
+	icons	\dest, \car, \cdr
+  .else
+    .ifdef inline_cons
+	icons	\dest, \car, \cdr
+    .else
+	bl	cons			@ rva <- addr of fre cel (gc if ndd), rvb <- 8, fre-ptr rsrvd lvl 1
+	stmia	rva!, {\car, \cdr}	@ rva <- addr of next free cell, + store car-cdr in prior free cell
+	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
 	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .endif
+  .endif
+.endm
+
+.macro list1 upd, dest, obj
+	bic	\upd, fre, #0x03	@ upd <- address of allocated memory
+	set	rvc, #null
+	stmia	\upd!, {\obj, rvc}	@ upd <- addr of next free cell, + store car-cdr in prior free cell
+	sub	\dest, \upd, #8		@ \dest <- address of cons cell, [*commit list destination*]
+	orr	fre, \upd, #0x02	@ de-reserve free-pointer, [*restart critical instruction*]
+.endm
+
+.macro ilist dest, obj
+	@ inlined list or list with MPU
+	@ dest <- (obj)  -- i.e. obj consed with #null
+	@ modifies:	rvc
+  .ifdef enable_MPU
+  	list1	fre, \dest, \obj	@ reserve, store, commit and de-reserve
+  .else
+	memsetlnk			@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrchk8			@ reserve memory, sufficient space available?
+	bls	alogc8			@	if not,  jump to perform gc
+  	list1	rva, \dest, \obj	@ store, commit and de-reserve
+  .endif
+.endm
+
+.macro list dest, obj
+	@ generic list
+	@ dest <- (obj)  -- i.e. obj consed with #null
+  .ifdef enable_MPU
+	ilist	\dest, \obj
+  .else
+    .ifdef inline_cons
+	ilist	\dest, \obj
+    .else
+	bl	cons			@ rva <- addr of fre cel (gc if ndd), rvb <- 8, fre-ptr rsrvd lvl 1
+	stmia	rva!, {\obj, rvc}	@ rva <- addr of next free cell, + store car-cdr in prior free cell
+	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit list destination*]
+	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .endif
+  .endif
+.endm
+
+
+.macro bcons1 upd, dest, bcar, bcdr, rest
+	@ upd is rva without MPU or fre with MPU
+	bic	\upd, fre, #0x03	@ rva <- address of allocated memory
+	set	rvc, \upd
+ 	stmia	\upd!, {\bcar,\bcdr,rvc}
+	stmia	\upd!, {\rest}
+	sub	\dest, \upd, #8		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, \upd, #0x02	@ de-reserve free-pointer, [*restart critical instruction*]
+.endm
+
+.macro ibcons dest, bcar, bcdr, rest
+  .ifdef enable_MPU
+  	bcons1	fre, \dest, \bcar, \bcdr, \rest	@ reserve, store, commit and de-reserve
+  .else
+	memsetlnk				@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrck	16				@ reserve memory, sufficient space available?
+	bls	algc16				@	if not,  jump to perform gc
+  	bcons1	rva, \dest, \bcar, \bcdr, \rest	@ store, commit and de-reserve
+  .endif
+.endm
+
+.macro bcons dest, bcar, bcdr, rest
+	@ generic cons-binding
+	@ dest <- ((bcar . bcdr) . rest)
+  .ifdef enable_MPU
+	ibcons	\dest, \bcar, \bcdr, \rest
+  .else
+    .ifdef inline_cons
+	ibcons	\dest, \bcar, \bcdr, \rest
+    .else
+	bl	cons2
+	stmia	rva!, {\bcar,\bcdr,rvc}
+	stmia	rva!, {\rest}
+	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .endif
+  .endif
+.endm
+
+.macro cons2 upd, dest, car, cdr, cddr
+	bic	\upd, fre, #0x03		@ rva <- address of allocated memory
+	set	rvc, \upd
+ 	stmia	\upd!, {\cdr,\cddr}
+	stmia	\upd!, {\car,rvc}
+	sub	\dest, \upd, #8		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, \upd, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+.endm
+
+.macro lcons dest, car, cdr, cddr
+	@ generic lcons: cons 2 items onto cddr
+	@ dest <- (car . (cdr . cddr))
+  .ifdef enable_MPU
+	cons2	fre, \dest, \car, \cdr, \cddr
+  .else
+    .ifdef inline_cons
+	memsetlnk				@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrck	16				@ reserve memory, sufficient space available?
+	bls	algc16				@	if not,  jump to perform gc
+	cons2	rva, \dest, \car, \cdr, \cddr
+    .else
+	bl	cons2
+	stmia	rva!, {\cdr,\cddr}
+	stmia	rva!, {\car,rvc}
+	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .endif
+  .endif
+.endm
+
+.macro cons3 upd, dest, car, cdr, cddr, cdddr
+	@ dest <- (car . (cdr . (cddr . cdddr)))
+	bic	\upd, fre, #0x03	@ rva <- address of allocated memory
+	set	rvc, \upd
+	stmia	\upd!, {\cddr, \cdddr}
+	stmia	\upd!, {\cdr, rvc}
+	sub	rvc, \upd, #8
+	stmia	\upd!, {\car, rvc}
+	sub	\dest, \upd, #8		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, \upd, #0x02	@ de-reserve free-pointer, [*restart critical instruction*]
+.endm
+
+.macro illcons dest, car, cdr, cddr, cdddr
+	@ llcons with inline cons or enable_MPU
+	@ dest <- (car . (cdr . (cddr . cdddr)))
+  .ifdef enable_MPU
+	cons3	fre, \dest, \car, \cdr, \cddr, \cdddr	@ reserve, store, commit and de-reserve
+  .else
+	memsetlnk					@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrck	24					@ reserve memory, sufficient space available?
+	bls	algc24					@	if not,  jump to perform gc
+	cons3	rva, \dest, \car, \cdr, \cddr, \cdddr	@ store, commit and de-reserve
+  .endif
+.endm
+
+.macro llcons dest, car, cdr, cddr, cdddr
+	@ generic llcons: cons 3 items onto cdddr
+	@ dest <- (car . (cdr . (cddr . cdddr)))
+  .ifdef enable_MPU
+	illcons	\dest, \car, \cdr, \cddr, \cdddr
+  .else
+    .ifdef inline_cons
+	illcons	\dest, \car, \cdr, \cddr, \cdddr
+    .else
+	bl	cons3
+	stmia	rva!, {\cddr,\cdddr}
+	stmia	rva!, {\cdr}
+	stmia	rva!, {rvb,\car,rvc}
+	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .endif
+  .endif
+.endm
+
+.macro isave reg
+	@ inlined save or save with MPU
+	@ dts <- (reg . dts)
+  .ifdef enable_MPU
+  	cons1	fre, dts, \reg, dts
+  .else
+	memsetlnk
+	memfrchk8
+	bls	alogc8			@	if not,  jump to perform gc
+  	cons1	rva, dts, \reg, dts
+  .endif
 .endm
 
 .macro save reg
-  .ifndef inline_cons
+	@ generic save
+	@ dts <- (reg . dts)
+  .ifdef enable_MPU
+	isave	\reg
+  .else
+    .ifdef inline_cons
+	isave	\reg
+    .else
 	bl	save			@ dts <- updated scheme stack with free car or 1st cell
 	setcar	dts, \reg		@ update car of the updated dts
-  .else
-	isave	\reg
+    .endif
   .endif
 .endm
+
 
 .macro save2 reg1, reg2
 	lcons	dts, \reg1, \reg2, dts
@@ -489,192 +759,87 @@
 	ldmia	dts, {\reg3, dts}
 .endm
 
-.macro icons dest, car, cdr
-	@ inlined version
-	@ dest <- (cons car cdr)
-	@
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	cmp	rva, fre		@ is an 8-byte cell available?
-	bls	alogc8			@	if not,  jump to perform gc
-	bic	rva, fre, #0x03		@ rva <- address of allocated memory
-	stmia	rva!, {\car, \cdr}	@ rva <- addr of next free cell, + store car-cdr in prior free cell
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
-.endm
 
-.macro cons dest, car, cdr
-	@
-	@ dest <- (cons car cdr)
-	@
-	@ Note 0: car and cdr must be in increasing order, eg. sv1 and sv5
-	@ Note 0+ rva, rvb and rvc cannot be dest, car or cdr
-	@ Note 1: This is conditionally restartable when fre is at reservation level 1 (after bl cons)
-	@ ------- condition is:	if
-	@				lr_irq = [*restart critical instruction*]
-	@			then
-	@				do not restart
-	@				execute this instr (save has been committed) and add 4 to lr_irq
-	@			else
-	@				 restart at cons: label
-	@ Note 2: Code restart is handled in ISR that wishes to allocate memory
-	@ Note 3: All level 1 code restart exceptions are based on same [*restart critical instruction*]
-	@
-  .ifndef inline_cons
-	bl	cons			@ rva <- addr of fre cel (gc if ndd), rvb <- 8, fre-ptr rsrvd lvl 1
-	stmia	rva!, {\car, \cdr}	@ rva <- addr of next free cell, + store car-cdr in prior free cell
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+.macro tagwenv dest, tag, obj1, obj2
+	@ dest <- [tag obj1 obj2 env]
+  .ifdef enable_MPU
+	bic	fre, fre, #0x03		@ rva <- address of allocated memory
+  	set	rva, \tag		@ rva <- tag
+	stmia	fre!, {rva, \obj1}
+	stmia	fre!, {\obj2, env}
+	sub	\dest, fre, #12		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, fre, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .else
-	icons	\dest, \car, \cdr
+	memsetlnk				@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrck	16				@ reserve memory, sufficient space available?
+	bls	algc16				@	if not,  jump to perform gc
+	bic	rva, fre, #0x03		@ rva <- address of allocated memory
+	stmia	rva!, {\tag}
+	stmia	rva!, {\obj1, \obj2, env}
+	sub	\dest, rva, #12		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .endif
 .endm
 
-.macro ibcons dest, bcar, bcdr, rest
-	@ inlined version of bcons
-	@ dest <- ((bcar . bcdr) . rest)
-   .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	sub	rva, rva, #8		@ rva <- comparison address
-	cmp	rva, fre		@ is a 16-byte cell available?
-	bls	algc16			@	if not,  jump to perform gc
-	bic	rva, fre, #0x03		@ rva <- address of allocated memory
-	set	rvc, rva
- 	stmia	rva!, {\bcar,\bcdr,rvc}
-	stmia	rva!, {\rest}
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
-.endm
-
-.macro bcons dest, bcar, bcdr, rest
-	@ dest <- ((bcar . bcdr) . rest)
-  .ifndef inline_cons
-	bl	cons2
-	stmia	rva!, {\bcar,\bcdr,rvc}
-	stmia	rva!, {\rest}
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+.macro tagwnul dest, tag, obj1, obj2
+	@ dest <- [tag obj1 obj2 ()]
+  .ifdef enable_MPU
+	bic	fre, fre, #0x03		@ rva <- address of allocated memory
+  	set	rva, \tag		@ rva <- tag
+	stmia	fre!, {rva, \obj1}
+	set	rvc, #null
+	stmia	fre!, {\obj2, rvc}
+	sub	\dest, fre, #12		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, fre, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .else
-	ibcons	\dest, \bcar, \bcdr, \rest
+	memsetlnk				@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrck	16				@ reserve memory, sufficient space available?
+	bls	algc16				@	if not,  jump to perform gc
+	bic	rva, fre, #0x03		@ rva <- address of allocated memory
+	stmia	rva!, {\tag}
+	set	rvc, #null
+	stmia	rva!, {\obj1, \obj2, rvc}
+	sub	\dest, rva, #12		@ \dest <- address of cons cell, [*commit cons destination*]
+	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .endif
 .endm
 
-.macro lcons dest, car, cdr, cddr
-	@ dest <- (car . (cdr . cddr))
-  .ifndef inline_cons
-	bl	cons2
-  .else
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	sub	rva, rva, #8		@ rva <- comparison address
-	cmp	rva, fre		@ is a 16-byte cell available?
-	bls	algc16			@	if not,  jump to perform gc
-	bic	rva, fre, #0x03		@ rva <- address of allocated memory
-	set	rvc, rva
-  .endif
-	stmia	rva!, {\cdr,\cddr}
-	stmia	rva!, {\car,rvc}
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
-.endm
-
-.macro illcons dest, car, cdr, cddr, cdddr
-	@ inlined version of llcons (below)
-	@ dest <- (car . (cdr . (cddr . cdddr)))
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	sub	rva, rva, #16		@ rva <- comparison address
-	cmp	rva, fre		@ is a 16-byte cell available?
-	bls	algc24			@	if not,  jump to perform gc
-	bic	rva, fre, #0x03		@ rva <- address of allocated memory
-	set	rvb, rva
-	add	rvc, rva, #8
-	stmia	rva!, {\cddr,\cdddr}
-	stmia	rva!, {\cdr}
-	stmia	rva!, {rvb,\car,rvc}
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
-.endm
-
-.macro llcons dest, car, cdr, cddr, cdddr
-	@ dest <- (car . (cdr . (cddr . cdddr)))
-  .ifndef inline_cons
-	bl	cons3
-	stmia	rva!, {\cddr,\cdddr}
-	stmia	rva!, {\cdr}
-	stmia	rva!, {rvb,\car,rvc}
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit cons destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
-  .else
-	illcons	\dest, \car, \cdr, \cddr, \cdddr
-  .endif
-.endm
 
 .macro sav__c
 	@ dts <- (cnt . dts)
-  .ifndef inline_cons
-	bl	sav__c
+  .ifdef enable_MPU
+	bic	fre, fre, #0x03		@ rva <- address of allocated memory
+	stmia	fre!, {cnt, dts}
+	sub	dts, fre, #8		@ dts <- address of cons cell, [*commit cons destination*]
+	orr	fre, fre, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .else
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop				@ <- lnk points here or at next instruction depending on alignment
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	cmp	rva, fre		@ is a 16-byte cell available?
+    .ifdef inline_cons
+	memsetlnk			@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrchk8			@ reserve memory, sufficient space available?
 	bls	alogc8			@	if not,  jump to perform gc
 	bic	rva, fre, #0x03		@ rva <- address of allocated memory
 	stmia	rva!, {cnt, dts}
 	sub	dts, rva, #8		@ dts <- address of cons cell, [*commit cons destination*]
 	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .else
+	bl	sav__c
+    .endif
   .endif
 .endm
 
 .macro isav_ec
 	@ inlined version of sav_ec (below)
 	@ dts <- (env cnt . dts)
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	sub	rva, rva, #8		@ rva <- comparison address
-	cmp	rva, fre		@ is a 16-byte cell available?
+  .ifdef enable_MPU
+	bic	fre, fre, #0x03		@ rva <- address of allocated memory
+	set	rvc, fre
+	stmia	fre!, {cnt, dts}
+	stmia	fre!, {env, rvc}
+	sub	dts, fre, #8		@ dts <- address of cons cell, [*commit cons destination*]
+	orr	fre, fre, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+  .else
+	memsetlnk			@ lnk <- memory transaction return address, (adjustd for T2 mode)
+	memfrck	16			@ fre <- ...bbb01 (level 1 reserved) and set ls flags if gc is needed
 	bls	algc16			@	if not,  jump to perform gc
 	bic	rva, fre, #0x03		@ rva <- address of allocated memory
 	set	rvc, rva
@@ -682,34 +847,35 @@
 	stmia	rva!, {cnt, rvb, env, rvc}
 	sub	dts, rva, #8		@ dts <- address of cons cell, [*commit cons destination*]
 	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+  .endif
 .endm
 
 .macro sav_ec
 	@ dts <- (env cnt . dts)
-  .ifndef inline_cons
-	bl	sav_ec
-  .else
+  .ifdef enable_MPU
 	isav_ec
+  .else
+    .ifdef inline_cons
+	isav_ec
+    .else
+	bl	sav_ec
+    .endif
   .endif
 .endm
 
 .macro sav_rc reg
 	@ dts <- (reg cnt . dts)
-  .ifndef inline_cons
-	bl	sav_rc
-	setcar	dts, \reg
+  .ifdef enable_MPU
+	bic	fre, fre, #0x03		@ rva <- address of allocated memory
+	set	rvc, fre
+	stmia	fre!, {cnt, dts}
+	stmia	fre!, {\reg, rvc}
+	sub	dts, fre, #8		@ dts <- address of cons cell, [*commit cons destination*]
+	orr	fre, fre, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .else
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	sub	rva, rva, #8		@ rva <- comparison address
-	cmp	rva, fre		@ is a 16-byte cell available?
+    .ifdef inline_cons
+	memsetlnk			@ lnk <- memory transaction return address, (adjustd for T2 mode)
+	memfrck	16			@ fre <- ...bbb01 (level 1 reserved) and set ls flags if gc is needed
 	bls	algc16			@	if not,  jump to perform gc
 	bic	rva, fre, #0x03		@ rva <- address of allocated memory
 	set	rvc, rva
@@ -717,26 +883,28 @@
 	stmia	rva!, {\reg, rvc}
 	sub	dts, rva, #8		@ dts <- address of cons cell, [*commit cons destination*]
 	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .else
+	bl	sav_rc
+	setcar	dts, \reg
+    .endif
   .endif
 .endm
 
 .macro savrec reg
 	@ dts <- (reg env cnt . dts)
-  .ifndef inline_cons
-	bl	savrec
-	setcar	dts, \reg
+  .ifdef enable_MPU
+	bic	fre, fre, #0x03		@ rva <- address of allocated memory
+	set	rvc, fre
+	stmia	fre!, {cnt, dts}
+	stmia	fre!, {env, rvc}
+	sub	rvc, fre, #8
+	stmia	fre!, {\reg, rvc}
+	sub	dts, fre, #8		@ dts <- address of cons cell, [*commit cons destination*]
+	orr	fre, fre, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .else
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	sub	rva, rva, #16		@ rva <- comparison address
-	cmp	rva, fre		@ is a 16-byte cell available?
+    .ifdef inline_cons
+	memsetlnk			@ lnk <- memory transaction return address, (adjustd for T2 mode)
+	memfrck	24			@ fre <- ...bbb01 (level 1 reserved) and set ls flags if gc is needed
 	bls	algc24			@	if not,  jump to perform gc
 	bic	rva, fre, #0x03		@ rva <- address of allocated memory
 	set	rvc, rva
@@ -746,42 +914,35 @@
 	stmia	rva!, {\reg, rvc}
 	sub	dts, rva, #8		@ dts <- address of cons cell, [*commit cons destination*]
 	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+    .else
+	bl	savrec
+	setcar	dts, \reg
+    .endif
   .endif
 .endm
 
-.macro ilist dest, obj
-	@ inlined version of list macro (below)
-	@ dest <- (obj)  -- i.e. obj consed with #null
-	@
-    .ifndef cortex
-	sub	lnk, pc,  #4		@ lnk <- memory transaction return address
-    .else
-	set	lnk, pc
-	nop
-	orr	lnk, lnk,  #lnkbit0	@ lnk <- memory transaction return address, adjustd for Thumb2 mode
-    .endif
-	eor	fre, fre, #0x03		@ fre <- ...bbb01			(reservation level 1)
-	vcrfi	rva, glv, 1		@ rva <- heaptop -- from global vector (*** NEW ***)
-	cmp	rva, fre		@ is an 8-byte cell available?
-	bls	alogc8			@	if not,  jump to perform gc
-	bic	rva, fre, #0x03		@ rva <- address of allocated memory
-	set	rvc, #null
-	stmia	rva!, {\obj, rvc}	@ rva <- addr of next free cell, + store car-cdr in prior free cell
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit list destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
-.endm
-
-.macro list dest, obj
-	@
-	@ dest <- (obj)  -- i.e. obj consed with #null
-	@
-  .ifndef inline_cons
-	bl	cons			@ rva <- addr of fre cel (gc if ndd), rvb <- 8, fre-ptr rsrvd lvl 1
-	stmia	rva!, {\obj, rvc}	@ rva <- addr of next free cell, + store car-cdr in prior free cell
-	sub	\dest, rva, #8		@ \dest <- address of cons cell, [*commit list destination*]
-	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+.macro vctrcr4 dest, reg1, reg2, reg3, reg4
+	@ dest <- #(cnt reg1 reg2 reg3 reg4)
+  .ifdef enable_MPU
+	bic	fre, fre, #0x03		@ fre <- ...bbb00			(reservation level 2)
+	set	rva, #vector_tag
+	orr	rva, rva, #0x500
+	set	rvb, cnt
+	stmia	fre!, {rva,rvb,\reg1,\reg2,\reg3,\reg4}	@ rva <- address of next free cell, and store reg, dts in free cell
+	sub	\dest, fre, #20		@ dts <- address of save cell, [*commit save destination*]
+	orr	fre, fre, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
   .else
-	ilist	\dest, \obj
+	memsetlnk			@ lnk <- memory transaction return address, (adjustd for T2 mode)
+	memfrck	24			@ fre <- ...bbb01 (level 1 reserved) and set ls flags if gc is needed
+	bls	algc24			@	if not,  jump to perform gc
+	bic	rva, fre, #0x03		@ rva <- free cell address
+	set	rvc, #vector_tag
+	orr	rvc, rvc, #0x500
+	stmia	rva!, {rvc}
+	stmia	rva!, {cnt,\reg1,\reg2,\reg3,\reg4}	@ rva <- address of next free cell, and store reg, dts in free cell
+	sub	\dest, rva, #20		@ dts <- address of save cell, [*commit save destination*]
+	orr	fre, rva, #0x02		@ de-reserve free-pointer, [*restart critical instruction*]
+
   .endif
 .endm
 
@@ -860,6 +1021,10 @@
 
 .macro setcdrhi pair, obj
 	strhi	\obj,  [\pair, #4]
+.endm
+
+.macro setcdrpl pair, obj
+	strpl	\obj,  [\pair, #4]
 .endm
 
 .macro caar dest, pair
@@ -953,19 +1118,14 @@
 	cdr	\dest,  \dest
 .endm
 
-@
-@ 6.3.5. Strings
-@
+/*------------------------------------------------------------------------------
+	6.3.5. Strings
+------------------------------------------------------------------------------*/
 
 .macro straloc dest, size
-	@
 	@ dest <- (make-string size)
-	@
 	@ dest and size must be different registers and not rva, rvb
-	@
-	@ align the number of bytes to allocate
-	lsr	rvb, \size, #2		@ rvb <- #bytes to allocate for data
-	add	rvb, rvb, #4		@ rvb <- #bytes to allocate + header's 4
+	int2raw	rvb, \size		@ rvb <- #bytes to allocate for data
 	@ allocate the aligned object
 	bl	zmaloc			@ rva <- addr of object (symbol-taggd), fre <- addr (rsrvd level 1)
 	add	rva, rva, rvb		@ rva <- address of next free cell
@@ -974,129 +1134,152 @@
 	@ update the object's tag for actual size and type (string)
 	lsl	rva, \size, #6
 	orr	rva, rva, #string_tag
-	str	rva, [\dest]		@ update string tag
+	str	rva, [\dest, #-4]	@ update string tag
 .endm
 
 .macro strlen dest, string
-	ldr	rvb, [\string]
+	ldr	rvb, [\string, #-4]
 	lsr	\dest, rvb, #6
 .endm
 
 .macro strref char, string, position
-	add	\position,  \position, #16
-.ifndef	cortex
+	@ modifies:	rva
+  .ifndef	cortex
 	ldrb	rva, [\string,  \position, ASR #2]
-.else
+  .else
 	asr	rva, \position, #2
 	ldrb	rva, [\string, rva]
-.endif
-	lsl	rva, rva, #8
-	orr	\char, rva, #char_tag
-	sub	\position,  \position, #16
-.endm
-
-.macro strrefi char, string, position
-	ldrb	rva, [\string,  #4+\position]
+  .endif
 	lsl	rva, rva, #8
 	orr	\char, rva, #char_tag
 .endm
 
-.macro strfi char, string, position
-	ldrb	rva, [\string,  #4+\position]
-	raw2chr	\char, rva
-.endm
 
-.macro strfieq char, string, position
-	ldrbeq	rva, [\string,  #4+\position]
-	it	eq
-	raw2chreq \char, rva
-.endm
-
-.macro strset char, string, position
-	@ modifies rva, rvc
-	add	rvc, \position, #16
-	lsr	rva, \char, #8
+.macro strset string, position, char
+	@ modifies:	rva, rvc (rvc on cortex only)
+	chr2raw	rva, \char
   .ifndef cortex
-	strb	rva, [\string, rvc, ASR #2]
+	strb	rva, [\string, \position, ASR #2]
   .else
-	asr	rvc, rvc, #2
+	asr	rvc, \position, #2
 	strb	rva, [\string, rvc]
   .endif
 .endm
 
-@
-@ 6.3.6. Vectors
-@
+/*------------------------------------------------------------------------------
+	6.3.6. Vectors
+------------------------------------------------------------------------------*/
 
 .macro veclen dest, vector
-	ldr	rvb, [\vector]
+	ldr	rvb, [\vector, #-4]
 	lsr	\dest, rvb, #6
 .endm
 
 .macro vecleneq dest, vector
-	ldreq	rvb, [\vector]
+	ldreq	rvb, [\vector, #-4]
 	it	eq
 	lsreq	\dest, rvb, #6
 .endm
 
 .macro veclenne dest, vector
-	ldrne	rvb, [\vector]
+	ldrne	rvb, [\vector, #-4]
 	it	ne
 	lsrne	\dest, rvb, #6
 .endm
 
+.macro	vecref res, vec, pos
+	@ output:	res (reg) <- item from vector
+	@ input:	vec (reg) <- vector 	(scheme vector)
+	@ input:	pos (reg) <- position 	(scheme int)
+	@ modifies:	rva
+	bic	rva, \pos, #0x03
+	ldr	\res, [\vec, rva]
+.endm
+	
+.macro	vecset vec, pos, val
+	@ input:	vec (reg) <- vector 	(scheme vector)
+	@ input:	pos (reg) <- position 	(scheme int)
+	@ input:	val (reg) <- item to store in vector
+	@ modifies rva
+	bic	rva, \pos, #0x03
+	str	\val, [\vec, rva]
+.endm
+	
 .macro vcrfi dest, vector, position
-	ldr	\dest,  [\vector,  #4+4*\position]	
+	ldr	\dest,  [\vector,  #4*\position]
 .endm
 
 .macro vcrfieq dest, vector, position
-	ldreq	\dest,  [\vector,  #4+4*\position]	
+	ldreq	\dest,  [\vector,  #4*\position]
 .endm
 
 .macro vcrfine dest, vector, position
-	ldrne	\dest,  [\vector,  #4+4*\position]	
+	ldrne	\dest,  [\vector,  #4*\position]
 .endm
 
 .macro vcrfimi dest, vector, position
-	ldrmi	\dest,  [\vector,  #4+4*\position]	
+	ldrmi	\dest,  [\vector,  #4*\position]
 .endm
 
 .macro vcrfipl dest, vector, position
-	ldrpl	\dest,  [\vector,  #4+4*\position]	
+	ldrpl	\dest,  [\vector,  #4*\position]
 .endm
 
 .macro vcrfihi dest, vector, position
-	ldrhi	\dest,  [\vector,  #4+4*\position]	
+	ldrhi	\dest,  [\vector,  #4*\position]
 .endm
 
 .macro vcsti vector, position, obj
-	str	\obj,  [\vector,  #4+4*\position]	
+	str	\obj,  [\vector,  #4*\position]
 .endm
 
 .macro vcstieq vector, position, obj
-	streq	\obj,  [\vector,  #4+4*\position]	
+	streq	\obj,  [\vector,  #4*\position]
 .endm
 
 .macro vcstine vector, position, obj
-	strne	\obj,  [\vector,  #4+4*\position]	
+	strne	\obj,  [\vector,  #4*\position]
 .endm
 
 .macro vcstipl vector, position, obj
-	strpl	\obj,  [\vector,  #4+4*\position]	
+	strpl	\obj,  [\vector,  #4*\position]
 .endm
 
 .macro vcstihi vector, position, obj
-	strhi	\obj,  [\vector,  #4+4*\position]	
+	strhi	\obj,  [\vector,  #4*\position]
 .endm
 
 .macro vcstimi vector, position, obj
-	strmi	\obj,  [\vector,  #4+4*\position]	
+	strmi	\obj,  [\vector,  #4*\position]
 .endm
 
-@
-@ bytevectors
-@
-			
+/*------------------------------------------------------------------------------
+	bytevectors
+------------------------------------------------------------------------------*/
+
+.macro	mkvu841 upd, dest
+	@ dest <- #vu8(space-for-4-items)
+	bic	\upd, fre, #0x03	@ upd <- reserve memory
+	set	rvc, #0x0400
+	orr	rvc, rvc, #bytevector_tag
+	stmia	\upd!, {rvc, lnk}	@ fre <- addr of next free cell
+	sub	\dest, \upd, #4		@ \dest <- address of cons cell, [*commit destination*]
+	orr	fre, \upd, #0x02	@ de-reserve memory, [*restart critical instruction*]
+.endm
+
+.macro	mkvu84 dest
+	@ dest <- #vu8(space-for-4-items)
+  .ifdef enable_MPU
+  	mkvu841	fre, \dest		@ reserve, store, commit and de-reserve
+  .else
+	memsetlnk			@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrchk8			@ reserve memory, sufficient space available?
+	bls	alogc8			@	if not,  jump to perform gc
+  	mkvu841	rva, \dest		@ store, commit and de-reserve
+  .endif
+.endm
+
+
 .macro vu8aloc dest, size
 	@
 	@ dest <- (make-bytevector size)
@@ -1104,8 +1287,7 @@
 	@ dest and size must be different registers and not rva, rvb
 	@
 	@ align the number of bytes to allocate
-	lsr	rvb, \size, #2		@ rvb <- #bytes to allocate for data
-	add	rvb, rvb, #4		@ rvb <- #bytes to allocate + header's 4
+	int2raw	rvb, \size		@ rvb <- #bytes to allocate for data
 	@ allocate the aligned object
 	bl	zmaloc			@ rva <- addr of object (symbol-taggd), fre <- addr (rsrvd level 1)
 	add	rva, rva, rvb		@ rva <- address of next free cell
@@ -1114,16 +1296,22 @@
 	@ update the object's tag for actual size and type (bytevector)
 	lsl	rva, \size, #6
 	orr	rva, rva, #bytevector_tag
-	str	rva, [\dest]		@ update tag
+	str	rva, [\dest, #-4]	@ update tag
 .endm
 
 .macro vu8len dest, vu8
-	ldr	rvb, [\vu8]
+	@ on entry:	vu8  (reg) <- bytevector
+	@ on exit:	dest (reg) <- bytevector length (scheme int)
+	@ modifies:	rvb
+	ldr	rvb, [\vu8, #-4]
 	lsr	\dest, rvb, #6
 .endm
 
 .macro vu8ref octet, vu8, position
-	add	\position,  \position, #16
+	@ on entry:	vu8      (reg) <- bytevector
+	@ on entry:	position (reg) <- index (scheme int)
+	@ on exit:	octet    (reg) <- item from bytevector (scheme int)
+	@ modifies:	rva
 .ifndef	cortex
 	ldrb	rva, [\vu8,  \position, ASR #2]
 .else
@@ -1132,25 +1320,26 @@
 .endif
 	lsl	rva, rva, #2
 	orr	\octet, rva, #i0
-	sub	\position,  \position, #16
 .endm
 
 .macro vu8set vu8, position, octet
+	@ on entry:	vu8      (reg) <- bytevector
+	@ on entry:	position (reg) <- index (scheme int)
+	@ on entry:	octet    (reg) <- item to store in bytevector (scheme int)
 	@ modifies rva, rvc
-	add	rvc, \position, #16
-	lsr	rva, \octet, #2
+	int2raw	rva, \octet
   .ifndef cortex
-	strb	rva, [\vu8, rvc, ASR #2]
+	strb	rva, [\vu8, \position, ASR #2]
   .else
-	asr	rvc, rvc, #2
+	int2raw	rvc, \position
 	strb	rva, [\vu8, rvc]
   .endif
 .endm
 
-@
-@ word (table) and byte references
-@	
-	
+/*------------------------------------------------------------------------------
+	word (table) and byte references
+------------------------------------------------------------------------------*/
+
 .macro tbrfi reg, table, position
 	ldr	\reg,  [\table,  #4*\position]	
 .endm
@@ -1218,7 +1407,7 @@
 .endif
 .endm
 
-.macro bytset reg, array, position	@ the 3 registers should be different
+.macro bytset array, position, reg	@ the 3 registers should be different
 	@ modifies rvc on cortex-m3
   .ifndef cortex
 	strb	\reg,  [\array,  \position, ASR #2 ]
@@ -1228,7 +1417,7 @@
   .endif
 .endm
 
-.macro bytseteq reg, array, position	@ the 3 registers should be different
+.macro bytseteq array, position, reg	@ the 3 registers should be different
 	@ modifies rvc on cortex-m3
   .ifndef cortex
 	strbeq	\reg,  [\array,  \position, ASR #2 ]
@@ -1239,7 +1428,7 @@
   .endif
 .endm
 
-.macro bytsetne reg, array, position	@ the 3 registers should be different
+.macro bytsetne array, position, reg	@ the 3 registers should be different
 	@ modifies rvc on cortex-m3
   .ifndef cortex
 	strbne	\reg,  [\array,  \position, ASR #2 ]
@@ -1250,7 +1439,7 @@
   .endif
 .endm
 
-.macro bytsetmi reg, array, position	@ the 3 registers should be different
+.macro bytsetmi array, position, reg	@ the 3 registers should be different
 	@ modifies rvc on cortex-m3
   .ifndef cortex
 	strbmi	\reg,  [\array,  \position, ASR #2 ]
@@ -1261,7 +1450,7 @@
   .endif
 .endm
 
-.macro bytsetu reg, array, position	@ the 3 registers should be different
+.macro bytsetu array, position, reg	@ the 3 registers should be different
 	@ used only within irq-disabled code zones
 	@ or if position is in rva-rvc
 	@ (does not disable/enable interrupts on cortex)
@@ -1286,7 +1475,7 @@
   .endif
 .endm
 
-.macro wrdst reg, array, position	
+.macro wrdst array, position, reg
 	@ array and position should be different registers,
 	@ array should not be rvc
 	@ modifies rvc on cortex-m3
@@ -1299,9 +1488,9 @@
 .endm
 
 
-@
-@ Addendum: Pair splitting
-@
+/*------------------------------------------------------------------------------
+	Addendum: Pair splitting
+------------------------------------------------------------------------------*/
 
 .macro snoc car, cdr, pair
 	ldmia	\pair, {\car, \cdr}
@@ -1319,53 +1508,105 @@
 	ldmiapl	\pair, {\car, \cdr}
 .endm
 
-@
-@ Addendum: Type analysis
-@
+/*------------------------------------------------------------------------------
+	Addendum: Type analysis
+------------------------------------------------------------------------------*/
+
+.macro fl2cp1 upd, cpx, real, imag
+	@ modifies:	sv3, fre, rva, rvb, rvc
+	bic	\upd, fre, #0x03	@ fre <- reserve memory
+	bic	rvc, \imag, #3
+	orr	rvc, rvc, \real, lsr #30
+	bic	rvb, \real, #3
+	lsl	rvb, rvb, #2
+	orr	rvb, rvb, #complex_tag
+	stmia	\upd!, {rvb, rvc}
+	sub	\cpx, \upd, #4		@ cpx <- address of rational, [*commit destination*]
+	orr	fre, \upd, #0x02	@ de-reserve free-pointer, [*restart critical instruction*]
+.endm
+
+.macro flt2cpx cpx, real, imag
+	@ modifies:	sv3, fre, rva, rvb, rvc
+	bic	sv3, lnk, #lnkbit0	@ sv3 <- lnk, saved (and made even if Thumb2)
+  .ifdef enable_MPU
+  	fl2cp1	fre, \cpx, \real, \imag	@ reserve, store, commit and de-reserve
+  .else
+	memsetlnk			@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrchk8			@ reserve memory, sufficient space available?
+	bls	alogc8			@	if not,  jump to perform gc
+  	fl2cp1	rva, \cpx, \real, \imag	@ store, commit and de-reserve
+  .endif
+	orr	lnk, sv3, #lnkbit0
+.endm
+
+.macro in2ra1 upd, rat, num, den
+	@ modifies:	fre, rva, rvb, rvc
+	bic	\upd, fre, #0x03	@ fre <- reserve memory
+	bic	rvc, \den, #3
+	orr	rvc, rvc, \num, lsr #30
+	bic	rvb, \num, #3
+	lsl	rvb, rvb, #2
+	orr	rvb, rvb, #rational_tag
+	stmia	\upd!, {rvb, rvc}
+	sub	\rat, \upd, #4		@ rat <- address of rational, [*commit destination*]
+	orr	fre, \upd, #0x02	@ de-reserve free-pointer, [*restart critical instruction*]
+.endm
+
+.macro int2rat rat, num, den
+	@ modifies:	fre, rva, rvb, rvc
+	bic	sv3, lnk, #lnkbit0	@ sv3 <- lnk, saved (and made even if Thumb2)
+  .ifdef enable_MPU
+  	in2ra1	fre, \rat, \num, \den	@ reserve, store, commit and de-reserve
+  .else
+	memsetlnk			@ lnk <- memory transaction return address (adjustd for T2 mode)
+	memfrchk8			@ reserve memory, sufficient space available?
+	bls	alogc8			@	if not,  jump to perform gc
+  	in2ra1	rva, \rat, \num, \den	@ store, commit and de-reserve
+  .endif
+	orr	lnk, sv3, #lnkbit0
+.endm
 
 .macro charp reg
 	and	rva, \reg, #0xFF
 	eq	rva, #char_tag
 .endm
 
-.macro nmbrp reg
-	@ raise eq flag if reg contains a rational, complex, int or float
-	@ uses rva
-	pntrp	\reg
-	itTT	eq
-	careq	rva, \reg
-	andeq	rva, rva, #0x07		@ rva <- two-bit tag of object in num
-	eqeq	rva, #0x03		@ is object a rational or complex?
-	itT	ne
-	andne	rva, \reg,  #0x03	@ rva <- two-bit tag of object in num
-	eqne	rva, #int_tag		@ is object an integer?
-	it	ne
-	eqne	rva, #float_tag		@	if not, is object a float?
-.endm
-
 .macro ratcpx reg
 	@ raise eq flag if reg contains a rational or complex
 	@ uses rva
-	pntrp	\reg
+	and	rva, \reg, #0x07
+	eq	rva, #0x04
 	itTT	eq
-	careq	rva, \reg
+	ldreq	rva, [\reg, #-4]
 	andeq	rva, rva, #0x07		@ rva <- two-bit tag of object in num
 	eqeq	rva, #0x03		@ is object a rational or complex?
+.endm
+
+.macro nmbrp reg
+	@ raise eq flag if reg contains a rational, complex, int or float
+	@ uses rva
+	ratcpx	\reg			@ is object in reg a rat/cpx?
+	itT	ne
+	andne	rva, \reg,  #0x03	@ 	if not, rva <- two-bit tag of object in reg
+	eqne	rva, #int_tag		@ 	if not, is object an integer?
+	it	ne
+	eqne	rva, #float_tag		@	if not, is object a float?
 .endm
 
 .macro varp reg
 	@ raise eq flag if reg contains a variable or syntax item
 	@ uses rva
-	and	rva, \reg, #0xDF
-	eq	rva, #0x8F
+	and	rva, \reg, #0xFF
+	eq	rva, #variable_tag
 .endm
 
 .macro tagdp reg
 	@ raise eq flag if reg points to a tagged item (string, vector, procedure, continuation, ...)
 	@ uses rva
-	pntrp	\reg
+	and	rva, \reg, #0x07
+	eq	rva, #0x04
 	itTT	eq
-	careq	rva, \reg
+	ldreq	rva, [\reg, #-4]
 	andeq	rva, rva, #0x47
 	eqeq	rva, #0x47
 .endm
@@ -1373,9 +1614,10 @@
 .macro sizdp reg
 	@ raise eq flag if reg points to a tagged-sized item (string, symbol, vector, ...)
 	@ uses rva
-	pntrp	\reg
+	and	rva, \reg, #0x07
+	eq	rva, #0x04
 	itTT	eq
-	careq	rva, \reg
+	ldreq	rva, [\reg, #-4]
 	andeq	rva, rva, #0xCF
 	eqeq	rva, #0x4F
 .endm
@@ -1383,10 +1625,10 @@
 .macro vctrp reg
 	@ raise eq flag if reg points to a vector
 	@ uses rva
-	pntrp	\reg
-	itTT	eq
-	careq	rva, \reg
-	andeq	rva, rva, #0xFF
+	and	rva, \reg, #0x07
+	eq	rva, #0x04
+	itT	eq
+	ldrbeq	rva, [\reg, #-4]
 	eqeq	rva, #vector_tag
 .endm
 
@@ -1404,50 +1646,39 @@
 .endm
 
 .macro macrop reg
-	car	rva, \reg
-	eq	rva, #macro		@ is tag in reg a macro tag?
+	@ modifies:	rva
+	and	rva, \reg, #0x07
+	eq	rva, #0x04
+	itTT	eq
+	ldreq	rva, [\reg, #-4]
+	eoreq	rva, rva, #0x0800	@ is tag in reg a macro tag?
+	eqeq	rva, #proc
 .endm
 
 .macro execp reg
-	pntrp	\reg
-	itTT	eq
-	careq	rva, \reg
-	andeq	rva, rva, #0xCF
-	eqeq	rva, #0xCF		@ is fun a primitive, procedure or continuation?
+	@ raises eq flag if \reg is normal prim, proc or cont (not direct prim)
+	@ modifies:	rva
+	and	rva, \reg, #0x07
+	eq	rva, #0x04
+	itE	eq
+	ldreq	rva, [\reg, #-4]
+	setne	rva, \reg
+	tst	rva, #0x0800
+	itT	eq
+	andeq	rva, rva, #0xf7
+	eqeq	rva, #0xd7
 .endm
 
-.macro qpair0 reg
-	@ raise eq flag if reg is an atom, sized item or rat/cpx
-	@ modifies:	 rva
-	pntrp	\reg
-	itTE	eq
-	careq	rva, \reg
-	andeq	rva, rva, #0xcf
-	setne	rva, #0x4f
-	eq	rva, #0x4f		@ is it a sized item?
-	itT	ne
-	andne	rva, rva, #0x07
-	eqne	rva, #0x03		@	if not, is it a rat/cpx?
+.macro pairp reg
+	tst	\reg, #0x07
 .endm
 
-.macro qpair2 reg
-	@ raise eq flag if reg is an atom, sized item, rat/cpx, syntax or assembled code
-	@ modifies:	 rva, rvb
-	pntrp	\reg			@ is it a pointer?
-	itTE	eq
-	careq	rvb, \reg		@	if so,  rvb <- tag or item
-	andeq	rva, rvb, #0xcf		@	if so,  rva <- tag masked for sized-item vs proc
-	setne	rva, #0x4f		@	if not, rva <- vector-tag (to raise eq flag below)
-	eq	rva, #0xcf		@ is it a procedure?
-	itTTT	eq
-	mvneq	rvb, rvb		@	if so,  rvb <- inverted tag
-	andeq	rvb, rvb, #0x4000	@	if so,  rvb <- lambda bit, isolated (inverted)
-	lsreq	rvb, rvb, #7		@	if so,  rvb <- lambda bit, shifted
-	biceq	rva, rva, rvb		@	if so,  rva <- tag identifying assembled code vs lambda
-	eq	rva, #0x4f		@ is it a sized item, non-pointer, or assembled code?
-	itT	ne
-	andne	rva, rva, #0x07		@	if not, rva <- 3-bit tag
-	eqne	rva, #0x03		@	if not, is it a rat/cpx?
+.macro pairpeq reg
+	tsteq	\reg, #0x07
+.endm
+
+.macro pairpne reg
+	tstne	\reg, #0x07
 .endm
 
 .macro tuckd datast, reg, datast2
@@ -1463,28 +1694,22 @@
 	save2	\tmp, \reg		@ dts <- (item1 reg item2 ...)
 .endm
 
-@
-@ EVAL
-@
+/*------------------------------------------------------------------------------
+	EVAL
+------------------------------------------------------------------------------*/
 
 .macro	evalsv1
-	and	rva, sv1, #0xff
-	eq	rva, #variable_tag
+	varp	sv1				@ is object a variable?
 	it	eq
-	bleq	sbevlv
-	pntrp	rva
-	itTE	eq
-	careq	rva, sv1
-	andeq	rva, rva, #0x47
-	setne	rva, #0x47
-	eq	rva, #0x47
-	it	ne
-	blne	sbevll	
+	bleq	sbevlv				@	if so,  sv1 <- value of var, rva <- non-pair
+	pairp	rva				@ is object in sv1 (with 8-bit tag in rva) a pair?
+	it	eq
+	bleq	sbevll				@	if so,  sv1 <- value of list in sv1
 .endm
 
-@
-@ Addendum: Calling and branching to scheme functions or labels
-@
+/*------------------------------------------------------------------------------
+	Addendum: Calling and branching to scheme functions or labels
+------------------------------------------------------------------------------*/
 
 .macro	call label
 .ifndef	cortex
@@ -1526,19 +1751,6 @@
 	eq	\reg, #i0
 .endm
 
-.macro	vecref res, vec, pos
-	bic	rva, \pos, #0x03
-	add	rva, rva, #4
-	ldr	\res, [\vec, rva]
-.endm
-	
-.macro	vecset vec, pos, val
-	@ modifies rva
-	bic	rva, \pos, #0x03
-	add	rva, rva, #4
-	str	\val, [\vec, rva]
-.endm
-	
 .macro	int2raw raw, int
 	asr	\raw, \int, #2
 .endm
@@ -1590,11 +1802,11 @@
 	it	eq
 	orreq	\chr, \chr, \raw, LSL #8
 .endm
-	
-@ ------------------------------------------------------------
-@ swap macros
-@ ------------------------------------------------------------
-	
+
+/*------------------------------------------------------------------------------
+	swap macros
+------------------------------------------------------------------------------*/
+
 .macro swap reg1, reg2, temp
 	set	\temp,  \reg1
 	set	\reg1,  \reg2
@@ -1608,317 +1820,6 @@
 	setmi	\reg2,  \temp
 .endm
 
-@ ------------------------------------------------------------
-@ enabling IRQ in VIC, ISR entry, clearing, exit compatibility
-@ ------------------------------------------------------------
-
-.macro	enable_VIC_IRQ
-
-.ifndef	cortex	@ arm7tdmi, arm920t
-  .ifndef LPC_2800	@ NOT lpc 2800
-    .ifndef S3C24xx
-      .ifndef OMAP_35xx
-	ldr	rva, =int_base		@ rva <- address of interrupt enable register
-	ldr	rvb, =scheme_ints_enb	@ rvb <- scheme interrupts
-	str	rvb, [rva, #int_enable]	@ enable scheme interrupts
-      .endif
-    .endif
-  .endif
-  .ifdef STR_9xx	@ enable VIC1 interrupts (in addition to VIC0 enabled above)
-	ldr	rva, =int_base2		@ rva <- address of interrupt enable register (16-31)
-	ldr	rvb, =scheme_ints_en2	@ rvb <- scheme interrupts (16-31)
-	str	rvb, [rva, #int_enable]	@ enable scheme interrupts (16-31)
-  .endif
-  .ifdef S3C24xx
-	set	rvb, #0x00
-	mvn	rvb, rvb
-	ldr	rva, =scheme_ints_enb	@ rvb <- scheme interrupts
-	bic	rvb, rvb, rva
-	ldr	rva, =int_base
-	str	rvb, [rva, #int_enable]	@ enable uart 0, and timer 0, 1 and usb ints in INTMSK
-  .endif
-  .ifdef LPC_2800
-	ldr	rva, =0x80300400	@ rva <- Interrupt Request Registers base address INT_REQ
-	ldr	rvb, =0x1C010001	@ rvb <- interrupt enable
-	str	rvb, [rva, #0x14]	@ INT_REQ5  <- Timer 0 zero Count interrupt enabled as IRQ
-	str	rvb, [rva, #0x18]	@ INT_REQ6  <- Timer 1 zero Count interrupt enabled as IRQ
-	str	rvb, [rva, #0x34]	@ INT_REQ13 <- I2C interrupt enabled as IRQ
-  .endif
-.else	@ cortex-m3
-	ldr	rva, =int_en_base	@ rva <- address of interrupt enable register
-	ldr	sv3, =BUFFER_START
-	vcrfi	rvb, sv3, CTX_EI_offset	@ rvb <- enabled scheme interrupts  0-31
-	str	rvb, [rva, #int_enabl1]	@ enable scheme interrupts  0-31
-	vcrfi	rvb, sv3, CTX_EI_offset+4 @ rvb <- enabled scheme interrupts  32-63
-	str	rvb, [rva, #int_enabl2]	  @ enable scheme interrupts
-  .if num_interrupts > 64
-	vcrfi	rvb, sv3, CTX_EI_offset+8 @ rvb <- enabled scheme interrupts  64-95
-	str	rvb, [rva, #int_enabl3]	  @ enable scheme interrupts
-  .endif
-.endif	@ cortex
-	
-.endm
-
-.macro	enterisr
-.ifndef	cortex	
-	@ enterisr for non-cortex-m3
-	sub	lnk, lnk, #4		@ Adjust lnk to point to return 
-	stmdb	sp!, {lnk}		@ store lnk_irq (pc_usr) on irq stack
-	mrs	lnk, spsr		@ lnk  <- spsr
-	tst	lnk, #IRQ_disable	@ were interrupts disabled?
-	ldmiane	sp!, {pc}^		@ If so, just return immediately
-	@ save some registers on stack
-	stmib	sp,  {lnk}		@ store spsr on irq stack (above lnk_irq/pc_usr)
-	stmdb	sp,  {fre, cnt, rva, rvb, rvc, lnk}^	@ store 5 regs and lnk_usr on irq stack
-	sub	sp,  sp, #24		@ sp  <- adjusted stack pointer (next free cell)
-	ldr	rvb, =int_base		@ rvb <- address of VIC IRQ Status register
-  .ifdef STR_7xx
-	ldr	rvc, [rvb, #0x18]	@ rvc <- EIC_IVR (indicates start of interrupt processing)
-	ldr	rvb, [rvb, #0x04]	@ rvb <- asserted interrupt, EIC_CICR
-  .endif
-  .ifdef AT91_SAM7
-	ldr	rvc, [rvb, #0x00]	@ rvc <- AIC_IVR (indicates start of interrupt processing)
-	ldr	rvb, [rvb, #8]		@ rvb <- asserted interrupt, AIC_ISR
-  .endif
-  .ifdef AT91_SAM9
-	ldr	rvc, [rvb, #0x00]	@ rvc <- AIC_IVR (indicates start of interrupt processing)
-	ldr	rvb, [rvb, #8]		@ rvb <- asserted interrupt, AIC_ISR
-  .endif
-  .ifdef S3C24xx
-	ldr	rvb, [rvb, #0x14]	@ rvb <- asserted interrupt, INTOFFSET1
-  .endif
-  .ifdef OMAP_35xx
-	ldr	rvb, [rvb, #0x40]	@ rvb <- asserted interrupt, INTCPS_SIR_IRQ
-	and	rvb, rvb, #0x7f
-  .endif
-  .ifdef LPC_2800
-	@ LPC-2800
-	ldr	rvc, [rvb]		@ rvc <- [int_priomask0]
-	ldr	rvc, [rvb, #0x0100]	@ rvc <- [int_vector0]
-	ldr	rvb, [rvb, #int_status]	@ rvb <- asserted interrupts
-	lsr	rvb, rvc, #3		@ rvb <- interrupt number + address bits
-	and	rvb, rvb, #0x1f		@ rvb <- interrupt number
-  .endif
-  .ifdef LPC_2000
-	ldr	rvc, [rvb, #int_status]	@ rvb <- asserted interrupts
-	set	rvb, #0
-	lsrs	rva, rvc, #16
-	addne	rvb, rvb, #16
-	setne	rvc, rva
-	lsrs	rva, rvc, #8
-	addne	rvb, rvb, #8
-	setne	rvc, rva
-	lsrs	rva, rvc, #4
-	addne	rvb, rvb, #4
-	setne	rvc, rva
-	lsrs	rva, rvc, #2
-	addne	rvb, rvb, #2
-	setne	rvc, rva
-	add	rvb, rvb, rvc, lsr #1
-  .endif
-  .ifdef  STR_9xx	@ dual 16-int VICs
-	ldr	rvc, [rvb, #int_status]	@ rvc <- asserted interrupts ( 0-15)
-	set	rvb, #0
-	eq	rvc, #0
-	ldreq	rvb, =int_base2
-	ldreq	rvc, [rvb, #int_status]	@ rvc <- asserted interrupts (33-64)
-	seteq	rvb, #16
-	tst	rvc, #0xff		@ is int in 0-7 or 16-23?
-	addeq	rvb, rvb, #8		@	if not, rvb <- int num + 8
-	lsreq	rvc, rvc, #8		@	if not, rvc <- ints, shifted
-	tst	rvc, #0x0f		@ is int in 0-3, 8-11, 16-19 or 24-27?
-	addeq	rvb, rvb, #4		@	if not, rvb <- int num + 4
-	lsreq	rvc, rvc, #4		@	if not, rvc <- ints, shifted
-	tst	rvc, #0x03		@ is int in 0-1, 4-5, 8-9, 12-13, 16-17, 20-21, 24-25 or 28-29?
-	addeq	rvb, rvb, #2		@	if not, rvb <- int num + 2
-	lsreq	rvc, rvc, #2		@	if not, rvc <- ints, shifted
-	tst	rvc, #0x01		@ is int even?
-	addeq	rvb, rvb, #1		@	if not, rvb <- updated interrupt number
-  .endif
-  .ifdef  EP_93xx	@ dual 32-int VICs
-	ldr	rvc, [rvb, #int_status]	@ rvc <- asserted interrupts (1-32)
-	set	rvb, #0
-	eq	rvc, #0
-	ldreq	rvb, =int_base2
-	ldreq	rvc, [rvb, #int_status]	@ rvc <- asserted interrupts (33-64)
-	seteq	rvb, #32
-	ldr	rva, =0xffff		@ rva <- initial mask
-	tst	rvc, rva		@ is int num between 0 and 15?
-	addeq	rvb, rvb, #16		@	if not, rvb <- int num + 16
-	lsreq	rvc, rvc, #16		@	if not, rvc <- ints, shifted
-	tst	rvc, #0xff		@ is int in 0-7 or 16-23?
-	addeq	rvb, rvb, #8		@	if not, rvb <- int num + 8
-	lsreq	rvc, rvc, #8		@	if not, rvc <- ints, shifted
-	tst	rvc, #0x0f		@ is int in 0-3, 8-11, 16-19 or 24-27?
-	addeq	rvb, rvb, #4		@	if not, rvb <- int num + 4
-	lsreq	rvc, rvc, #4		@	if not, rvc <- ints, shifted
-	tst	rvc, #0x03		@ is int in 0-1, 4-5, 8-9, 12-13, 16-17, 20-21, 24-25 or 28-29?
-	addeq	rvb, rvb, #2		@	if not, rvb <- int num + 2
-	lsreq	rvc, rvc, #2		@	if not, rvc <- ints, shifted
-	tst	rvc, #0x01		@ is int even?
-	addeq	rvb, rvb, #1		@	if not, rvb <- updated interrupt number
-  .endif
-.else	
-	@ enterisr for cortex-m3
-	mrs	sp,  psp		@ sp  <- psp stack
-	@ *** Workaround for Cortex-M3 errata bug #382859, Category 2, present in r0p0, fixed in r1p0
-	@ *** affects LM3S1968 (needed for multitasking)
-	ldr	rvb, [sp, #28]		@ rvb <- saved xPSR
-	ldr	rva, =0x0600000c	@ rva <- bit mask to identify if interruptd instruction was ldm/stm
-	tst	rvb, rva		@ was interruted instruction ldm/stm?
-	itT	eq
-	biceq	rvb, rvb, #0xf0		@	if so,  rvb <- xPSR set to restart (not continue) ldm/stm
-	streq	rvb, [sp, #28]		@	if so,  store xPSR back on stack
-	@ *** end of workaround
-	ldr	rvc, =0xe000ed00
-	ldr	rvb, [rvc, #4]
-	set	rvc, #0xff
-	orr	rvc, rvc, #0x0100
-	and	rvb, rvb, rvc
-	sub	rvb, rvb, #16
-.endif
-	
-.endm
 
 	
-.macro	clearUartInt	@ clear interrupt in uart with base address in rva
-  .ifndef cortex
-    .ifndef S3C24xx
-      .ifndef STR_9xx
-	ldr	cnt, [rva, #uart_istat]	@ cnt <- interrupt status (clears UART interrupt on LPC2000)
-      .endif
-    .endif
-    .ifdef STR_9xx
-	ldr	cnt, [rva, #uart_istat]	@ cnt <- interrupt status (clears UART interrupt on LPC2000)
-	str	cnt, [rva, #uart_iclear]
-    .endif
-    .ifdef S3C24xx	
-	ldr	rvc, [rva, #0x14]	@ cnt <- error status (clears potential overrun and frame errors)
-	ldr	rva, =int_base		@ clear interrupt
-	ldr	rvc, [rva, #0x18]	@ get sub-int in SUBSRCPND
-	str	rvc, [rva, #0x18]	@ clear Rx sub-int in SUBSRCPND
-    .endif
-  .else @ cortex
-    .ifdef LPC_17xx
-	ldr	cnt, [rva, #uart_istat]	@ cnt <- interrupt status (clears UART interrupt on LPC17xx)
-    .endif
-    .ifdef AT91_SAM3S
-	ldr	cnt, [rva, #uart_istat]	@ cnt <- interrupt status (clears UART interrupt)
-    .endif
-  .endif
-.endm
-
-.macro	clearTimerInt	@ clear interrupt in timer peripheral block with base address in rva
-  .ifndef LPC_2800
-    .ifndef S3C24xx	
-     .ifndef OMAP_35xx	
-      .ifndef STR_9xx
-	ldr	rvc, [rva, #timer_istat]@ at91sam7
-	str	rvc, [rva, #timer_iset]	@ lpc2000
-	set	rvc, #0			@ rvc <- 0
-	str	rvc, [rva, #timer_iset]	@ str711, STM32
-       .endif
-      .endif
-    .endif
-    .ifdef OMAP_35xx	
-	ldr	rvc, [rva, #timer_istat]@ at91sam7
-	str	rvc, [rva, #timer_iset]	@ lpc2000
-	set	rvc, #0			@ rvc <- 0
-	str	rvc, [rva, #timer_iset]	@ str711, STM32
-    .endif
-    .ifdef STR_7xx
-	str	rvc, [rva, #timer_ctrl]	@ stop timer
-    .endif
-    .ifdef STR_9xx
-	set	rvc, #0			@ rvc <- 0
-	str	rvc, [rva, #timer_ctrl]	@ stop timer
-	str	rvc, [rva, #0x10]	@ reset count
-	str	rvc, [rva, #timer_iset]	@ clear flags
-    .endif
-  .else	@ LPC_2800
-	set	rvc, #0			@ rvc <- 0
-	str	rvc, [rva, #timer_ctrl]	@ stop the timer
-	str	rvc, [rva]		@ clear the load value
-	str	rvc, [rva, #timer_iset]	@ clear the interrupt
-  .endif
-.endm
-
-.macro	clearVicInt	@ clear interrupt in interrupt vector (if needed)
-  .ifndef cortex
-    .ifndef S3C24xx	
-      .ifndef OMAP_35xx	
-        .ifndef STR_7xx
-          .ifndef STR_9xx
-	ldr	rva, =int_base		@ 
-	ldr	rvc, =int_clear_vals
-	str	rvc, [rva, #int_clear]	@ clear interrupt
-	  .endif
-        .endif
-      .endif
-    .endif
-    .ifdef STR_7xx
-	ldr	rva, =int_base		@ 
-	ldr	rvc, [rva, #0x04]
-	set	rva, #1
-	lsl	rvc, rva, rvc
-	ldr	rva, =int_base		@ 
-	str	rvc, [rva, #int_clear]	@ clear interrupt
-    .endif
-    .ifdef STR_9xx
-    .endif
-    .ifdef S3C24xx	
-	ldr	rva, =int_base		@ 
-	ldr	rvc, [rva, #int_status]	@ rvc <- asserted interrupt bit
-	str	rvc, [rva, #int_clear]	@ clear int in SRCPND
-	str	rvc, [rva, #int_status]	@ clear int in INTPND
-    .endif
-    .ifdef OMAP_35xx	
-	ldr	rva, =int_base		@ 
-	ldr	rvc, =int_clear_vals
-	str	rvc, [rva, #int_clear]
-	dsb				@ data sync barrier (ensure interrupt cleared before proceeding)
-    .endif
-  .endif
-.endm
-	
-.macro	exitisr
-  .ifndef cortex
-	@ exitisr for non-cortex
-	ldr	rvc, [sp,  #28]
-	msr	spsr_cxsf, rvc		@ restore spsr
-    .ifndef STR_7xx
-      .ifndef  AT91_SAM7
-	ldmia	sp, {fre, cnt, rva, rvb, rvc, lnk}^	@ Restore registers
-	add	sp, sp, #24
-	ldmia	sp!, {lnk}
-	movs	pc,  lnk		@ Return
-      .endif
-    .endif
-    .ifdef STR_7xx
-	ldmia	sp!, {fre, cnt, rva, rvb, rvc, lnk, pc}^ @ Restore regs (STR7 USB doesn't like other meth)
-    .endif
-    .ifdef  AT91_SAM7
-	ldmia	sp!, {fre, cnt, rva, rvb, rvc, lnk, pc}^ @ Restore regs (USB meddles with SPI otherwise)
-    .endif
-  .else	
-	@ exitisr for cortex
-	ldr	pc,  =0xfffffffd	@ return to thread mode, use process stack
-  .endif
-.endm
-
-.macro	isrexit
-	@ second version - different from exitisr for STR7 and AT91SAM7 only
-  .ifndef cortex	
-	@ isr exit for non- cortex
-	ldr	rvc, [sp,  #28]
-	msr	spsr_cxsf, rvc		@ restore spsr
-	ldmia	sp, {fre, cnt, rva, rvb, rvc, lnk}^	@ Restore registers
-	add	sp, sp, #24
-	ldmia	sp!, {lnk}
-	movs	pc,  lnk		@ Return
-  .else	
-	@ isr exit for cortex
-	ldr	pc,  =0xfffffffd	@ return to thread mode, use process stack
-  .endif
-.endm
 

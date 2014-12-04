@@ -1,0 +1,17 @@
+#!/bin/sh
+# ------------------------------------------------------------------------------
+# ArmPit Scheme (aps) 070 -- script to remove utility program executables
+# (Fedora Linux 3.4.4-4.fc16.x86_64)
+# (gcc (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1))
+# ------------------------------------------------------------------------------
+
+rm NXP/util/lpc_add_chksum
+rm NXP/LPC_2800/util/bin2loadable
+rm NXP/LPC_4300/util/bin2loadable
+rm NXP/LPC_4300/util/bin2bytevector
+rm TI/AM335x/util/bin2loadable
+rm TI/OMAP3x/util/bin2loadable
+rm TI/OMAP4x/util/bin2loadable
+rm TI/OMAP4x/util/bin2bytevector
+
+

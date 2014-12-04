@@ -1,10 +1,10 @@
 -----------------------------------------------------------------
 
-Armpit Scheme Version 060
+ArmPit Scheme (aps) Version 070
 
-(c) 2006-2013, Hubert Montas
+(c) 2006-2014, Hubert Montas
 
-Please read license (MIT) in source code file: armpit_060.s
+Please read license (MIT) in source code file: aps_070.s
 
 -----------------------------------------------------------------
 
@@ -12,33 +12,53 @@ This release of Armpit Scheme is designed to be assembled using
 GNU binutils version 2.22.
 
 The source code distribution has a new directory structure.
-The file armpit_060.s at the top of the structure
+The file aps_070.s at the top of the structure
 (where this README is) imports the needed files for assembly.
 Machine-independent source code, assembler macros and constants
-are in the "common" sub-directory. Machine-specific header files
-and source code are in the "mcu_dependent" sub-directory with
-deeper sub-directories separated by MCU family (eg. LPC_2000).
-Within those sub-directories, sub-sub-directories (eg. LPC_H2148)
-are used to store board-specific files (board.h).
+are in the "aps_common" sub-directory. Machine-specific header files
+and source code are in sub-directory named after MCU manufacturers 
+(Atmel, Cirrus, ..., TI) with deeper sub-directories separated by
+MCU family (eg. LPC_2000). Within those sub-directories,
+sub-sub-directories (eg. LPC_H2148) are used to store board-specific
+configuration files (board.h).
 
-Pre-built .bin files are included in the bin directory.
-Corresponding .map files indicate addresses of some symbols.
+Pre-built .bin files (and bin.dfu, bin.MLO files) are included
+in the "aps_bin" directory. Corresponding .map files indicate
+addresses of some symbols.
 
 To re-build (if desired), one would typically modify options in
-a board-specific board.h file and then apply the appropriate
-single-line example from the buildarmpit script file. For example:
+a board-specific board.h file and then execute the appropriate
+single-line from the build_all_aps script file. For example:
 
-   ./buildarmpit 060 LPC_2000   LPC_H2148
+   ./buildaps 070 NXP     LPC_2000  LPC_H2148
 
-The buildarmpit script and the bld_link_addresses file that it
-relies on are in the top directory. The script reads the source
-in the top and sub- directories and writes binary and map
-files to the bin directory. The generation of an Intel hex (.hex)
-file is commented out (uncomment if desired before running the
-script). Depending on the target MCU and upload method, it may
-be necessary to post-process the binary into a .dfu, .ift or .ebn
-file using appropriate software. The How To web page on Armpit
-Scheme installation provides some related information and/or code.
+Executing ./build_all_aps directly builds .bin files for all targets.
+
+The build_all_aps (and buildaps) script and the bld_link_addresses
+file that it relies on are in the top directory. The script reads
+the source in the top and sub- directories and writes binary and map
+files to the bin directory. Depending on the target MCU and upload
+method, it may be necessary to post-process the binary into a .dfu,
+.MLO (formerly .ift or .ebn) file using appropriate software. 
+This version of ArmPit Scheme includes such software, in ANSI C,
+in the "util" sub-directory, under MCU family sub-directories, for
+example, in:
+
+    NXP/LPC_2800/util
+
+and, if this sub-directory is present, the buildaps script will
+perform the needed post-processing, resulting in .bin.dfu or
+.bin.MLO files ready for upload. There is also a util directory
+under NXP that contains the lpc_add_chksum.c code for adding a
+checksum to a .bin file for NXP LPC-2000 MCUs but this is not
+executed by buildaps as it is not needed when lpc21isp is used to
+upload the .bin to the MCU. The utility programs are compiled
+(only once, with gcc) by executing the top-level directory script:
+
+   ./compile_aps_utils
+
+The How To web page on Armpit Scheme installation provides some
+related information and/or code.
 
 -----------------------------------------------------------------
 

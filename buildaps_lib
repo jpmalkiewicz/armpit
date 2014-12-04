@@ -1,0 +1,29 @@
+#!/bin/sh
+# ------------------------------------------------------------------------------
+# Armpit Scheme 070 standalone library build script
+# (Fedora Linux 3.14.8-200.fc20.x86_64, GNU assembler/binutils version 2.22)
+#
+# Note: Edit Armpit Scheme source files with proper options before
+#       running this script.
+# ------------------------------------------------------------------------------
+# EXAMPLES: see build_all_aps script for example use
+# ------------------------------------------------------------------------------
+
+echo "-------------------"
+echo "BRD:" $4", LIB(S):" $5 $6
+arm-none-eabi-as -Iaps_common -Iaps_common/io_ports -I$2 -I$2/$3 -I$2/$3/$4 -o a.o aps_$5_$1.s
+arm-none-eabi-ld -Map aps_bin/$4_$5_aps_$1.map --script bld_link_addresses -o a.elf a.o
+arm-none-eabi-objcopy -O binary a.elf  aps_bin/$4_$5_aps_$1.bin
+rm a.o
+rm a.elf
+# postprocessing to make a scheme bytevector file from bin file
+$2/$3/util/bin2bytevector aps_bin/$4_$5_aps_$1.bin
+rm aps_bin/$4_$5_aps_$1.bin
+# coprocessor library code building (assembly and bin->bytevector)
+if [ -n "$6" ]
+then
+  $2/$3/cpo_code/build_cpo_code $2/$3/cpo_code/$6
+  $2/$3/util/bin2bytevector $2/$3/cpo_code/$6.bin
+  mv $2/$3/cpo_code/$6.bin.scm aps_bin/$4_$6_aps_$1.bin.scm
+fi
+

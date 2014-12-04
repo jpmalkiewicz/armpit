@@ -1,0 +1,34 @@
+#!/bin/sh
+# ------------------------------------------------------------------------------
+# ArmPit Scheme (aps) 070 build script
+# (Fedora Linux 3.14.8-200.fc20.x86_64, GNU assembler/binutils version 2.22)
+#
+# Note: Edit ArmPit Scheme (aps) source file with proper options before
+#       running this script.
+# ------------------------------------------------------------------------------
+# EXAMPLES: see build_all_aps script for example use
+# ------------------------------------------------------------------------------
+
+echo "-------------------"
+echo "BRD:" $4 $5
+arm-none-eabi-as -Iaps_common -Iaps_common/io_ports -I$2 -I$2/$3 -I$2/$3/$4 -o a.o aps_$1.s
+arm-none-eabi-ld -Map aps_bin/$4_aps_$1.map --script bld_link_addresses -o a.elf a.o
+arm-none-eabi-objcopy -O binary a.elf  aps_bin/$4_aps_$1.bin
+rm a.o
+rm a.elf
+# coprocessor code building (assembly)
+if [ -n "$5" ]
+then
+  $2/$3/cpo_code/build_cpo_code $2/$3/cpo_code/$5
+fi
+# postprocessing to make loadable bin file, if arch needs it (eg. OMAP->.MLO, LPC43xx->.dfu)
+if [ -d "$2/$3/util" ]
+then
+  if [ -z "$5" ]
+  then
+    $2/$3/util/bin2loadable aps_bin/$4_aps_$1.bin
+  else
+    $2/$3/util/bin2loadable aps_bin/$4_aps_$1.bin $2/$3/cpo_code/$5.bin
+  fi
+fi
+

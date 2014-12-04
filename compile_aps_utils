@@ -1,0 +1,17 @@
+#!/bin/sh
+# ------------------------------------------------------------------------------
+# ArmPit Scheme (aps) 070 -- utility program build script
+# (Fedora Linux 3.4.4-4.fc16.x86_64)
+# (gcc (GCC) 4.8.3 20140624 (Red Hat 4.8.3-1))
+# ------------------------------------------------------------------------------
+
+gcc -o NXP/util/lpc_add_chksum          NXP/util/lpc_add_chksum.c
+gcc -o NXP/LPC_2800/util/bin2loadable   NXP/LPC_2800/util/bin2loadable.c
+gcc -o NXP/LPC_4300/util/bin2loadable   NXP/LPC_4300/util/bin2loadable.c
+gcc -o NXP/LPC_4300/util/bin2bytevector NXP/LPC_4300/util/bin2bytevector.c
+gcc -o TI/AM335x/util/bin2loadable      TI/AM335x/util/bin2loadable.c
+gcc -o TI/OMAP3x/util/bin2loadable      TI/OMAP3x/util/bin2loadable.c
+gcc -o TI/OMAP4x/util/bin2loadable      TI/OMAP4x/util/bin2loadable.c
+gcc -o TI/OMAP4x/util/bin2bytevector    TI/OMAP4x/util/bin2bytevector.c
+
+

@@ -1,0 +1,80 @@
+#!/bin/sh
+# ------------------------------------------------------------------------------
+# ArmPit Scheme (aps) 070 build all aps script
+# (Fedora Linux 3.14.8-200.fc20.x86_64, GNU assembler/binutils version 2.22)
+#
+# ==============================================================================
+#
+#    MAIN APPLICATION
+#
+# ==============================================================================
+# ARM7TDMI ----------------------------------------
+ 	./buildaps 070 Atmel   AT91SAM7  SAM7_H256		# Olimex SAM7-H256
+ 	./buildaps 070 Atmel   AT91SAM7  SAM7_P256		# Olimex SAM7-P256
+ 	./buildaps 070 Atmel   AT91SAM7  SAM7_1184		# Microbus 1184-04
+ 	./buildaps 070 NXP     LPC_2000  LCDDemo_2158		# FutureDesign LCDDemo-2158
+ 	./buildaps 070 NXP     LPC_2000  LPC2478_STK		# Olimex LPC2478-STK
+ 	./buildaps 070 NXP     LPC_2000  LPC_H2103		# Olimex LPC-H2103
+ 	./buildaps 070 NXP     LPC_2000  LPC_H2148		# Olimex LPC-H2148
+ 	./buildaps 070 NXP     LPC_2000  LPC_H2214		# Olimex LPC-H2214
+ 	./buildaps 070 NXP     LPC_2000  LPC_H2294		# Olimex LPC-H2294
+ 	./buildaps 070 NXP     LPC_2000  SFE_Logomatic1		# SparkFun Logomatic V1
+ 	./buildaps 070 NXP     LPC_2000  SFE_Logomatic2		# SparkFun Logomatic V2
+ 	./buildaps 070 NXP     LPC_2000  TINY_2106		# NewMicros Tiny-2106
+ 	./buildaps 070 NXP     LPC_2000  TINY_2131		# NewMicros Tiny-2131
+ 	./buildaps 070 NXP     LPC_2000  TINY_2138		# NewMicros Tiny-2138
+ 	./buildaps 070 NXP     LPC_2800  LPC_H2888		# Olimex LPC-H2888
+ 	./buildaps 070 ST      STR7x     STR_H711		# Olimex STR-H711
+# ARM9TDMI ----------------------------------------
+ 	./buildaps 070 Atmel   AT91SAM9  SAM9_L9261		# Olimex SAM9-L9261
+ 	./buildaps 070 Cirrus  EP_93xx   CS_E9302		# Olimex CS-EP9302
+ 	./buildaps 070 Samsung S3C24xx   TCT_Hammer		# TinCanTools Hammer
+ 	./buildaps 070 ST      STR9x     STR91X_M		# InSem STR91X-M
+# Cortex-M3 ---------------------------------------
+ 	./buildaps 070 Atmel   AT91SAM3S SAM3_H256		# Olimex SAM3-H256
+ 	./buildaps 070 NXP     LPC_1300  LPC_P1343		# Olimex LPC-P1343
+ 	./buildaps 070 NXP     LPC_1700  Blueboard_1768		# NGX Blueboard LPC1768-H
+        ./buildaps 070 NXP     LPC_1700  mbed_NXP_LPC1768       # mbed NXP LPC1768
+ 	./buildaps 070 ST      STM32F1   STM32_ARMka_F103	# ARMka STM32-F103 version
+ 	./buildaps 070 ST      STM32F1   STM32_DT_Board		# InSem/Lodin STM32-DOT-BOARD
+ 	./buildaps 070 ST      STM32F1   STM32_Fractal		# Fractal MCU32-1.12 Board
+ 	./buildaps 070 ST      STM32F1   STM32_H103		# Olimex STM32-H103
+ 	./buildaps 070 ST      STM32F1   STM32_H107		# Olimex STM32-H107
+ 	./buildaps 070 ST      STM32F1   STM32_LCD		# Olimex STM32-LCD
+ 	./buildaps 070 TI      LM3Sx     EVB_LM3S1968		# TI LM3S1968-EVB
+ 	./buildaps 070 TI      LM3Sx     EVB_LM3S6965		# TI LM3S6965-EVB
+ 	./buildaps 070 TI      LM3Sx     IDM_LM3S1958		# TI IDM-L35
+ 	./buildaps 070 TI      LM3Sx     TI_EvalBot		# TI Evalbot LM3S9B92
+# Cortex-M4 ---------------------------------------
+ 	./buildaps 070 Atmel   AT91SAM4S SAM4S_XPLD		# Atmel/Embest SAM4S-Xplained
+ 	./buildaps 070 Atmel   AT91SAM4S SAMG53_XPLD		# Atmel SAMG53-Xplained
+ 	./buildaps 070 Freescale MK64F12 FRDM_K64F		# Freescale FRDM-K64F
+ 	./buildaps 070 NXP     LPC_4300  LPC4330Xplorer cpo_usb	# NGX LPC4330-Xplorer with cpo
+ 	./buildaps 070 NXP     LPC_4300  LPC4357Xplorer		# NGX LPC4357-Xplorer++ DFU
+ 	./buildaps 070 NXP     LPC_4300  LPC4357Xplorer_Flash	# NGX LPC4357-Xplorer++ Flash
+ 	./buildaps 070 ST      STM32F4   Nucleo_F401RE		# STM STM32 Nucleo-F401RE
+ 	./buildaps 070 ST      STM32F4   STM32F4_Discov		# STM STM32F4-Discovery F407
+ 	./buildaps 070 ST      STM32F4   STM32F429_Disco	# STM STM32F4-Discovery F429
+ 	./buildaps 070 TI      LM4Fx     EK_LM4F120		# TI EK-LM4F120XL Launchpad
+ 	./buildaps 070 TI      LM4Fx     EK_LM4F232	 	# TI EK-LM4F232
+ 	./buildaps 070 TI      LM4Fx     EK_TM4C1294		# TI EK-TM4C1294XL Launchpad
+# Cortex-A8 ---------------------------------------
+ 	./buildaps 070 TI      AM335x    TI_BeagleBoneBlack	# TI Beagle Bone Black
+ 	./buildaps 070 TI      OMAP3x    GMX_Overo_Tide		# Gumstix Overo Tide
+ 	./buildaps 070 TI      OMAP3x    TI_Beagle		# TI Beagle rev B7
+ 	./buildaps 070 TI      OMAP3x    TI_Beagle_XM		# TI Beagle XM rev C
+# Cortex-A9 ---------------------------------------
+ 	./buildaps 070 TI      OMAP4x    DuoveroCrystal		# Gumstix Duovero Crystal
+# ==============================================================================
+#
+#    LIBRARIES (to load while running)
+#
+# ==============================================================================
+# Cortex-M4 ---------------------------------------
+	./buildaps_lib 070 NXP LPC_4300 LPC4357Xplorer_lib numbers cpo_usb # NGX LPC4357-Xplorer++
+# Cortex-A9 ---------------------------------------
+ 	./buildaps_lib 070 TI  OMAP4x   DuoveroCrystal_lib numbers	   # Gumstix Duovero Crystal
+# ==============================================================================
+
+
+
